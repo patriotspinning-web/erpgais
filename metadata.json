@@ -1,0 +1,6 @@
+{
+  "name": "Patriot ERP - Spinning Mill Inventory",
+  "description": "Comprehensive Spinning Mill ERP for Cotton, Wastage, Spare Parts, Yarn, and Quality Testing (HVI & Uster) with Excel/PDF reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

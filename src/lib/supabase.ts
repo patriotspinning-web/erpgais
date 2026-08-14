@@ -134,13 +134,20 @@ CREATE TABLE IF NOT EXISTS spare_issues (
 -- 8. Yarn Receives Table
 CREATE TABLE IF NOT EXISTS yarn_receives (
   id BIGINT PRIMARY KEY,
+  mrr_no TEXT,
   date TEXT NOT NULL,
+  shift TEXT,
+  yarn_type TEXT,
   count TEXT NOT NULL,
   lot_no TEXT NOT NULL,
-  process TEXT NOT NULL,
-  mixing_ratio TEXT,
-  quantity NUMERIC DEFAULT 0,
-  bags NUMERIC DEFAULT 0,
+  packaging_type TEXT,
+  bags_cartons NUMERIC DEFAULT 0,
+  cones NUMERIC DEFAULT 0,
+  gross_weight_kg NUMERIC DEFAULT 0,
+  tare_weight_kg NUMERIC DEFAULT 0,
+  net_weight_kg NUMERIC DEFAULT 0,
+  net_weight_lbs NUMERIC DEFAULT 0,
+  received_by TEXT,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -148,13 +155,21 @@ CREATE TABLE IF NOT EXISTS yarn_receives (
 -- 9. Yarn Issues Table
 CREATE TABLE IF NOT EXISTS yarn_issues (
   id BIGINT PRIMARY KEY,
+  delivery_challan_no TEXT,
   date TEXT NOT NULL,
+  buyer_party TEXT,
   count TEXT NOT NULL,
   lot_no TEXT NOT NULL,
-  process TEXT NOT NULL,
-  issue_to TEXT NOT NULL,
-  quantity NUMERIC DEFAULT 0,
-  bags NUMERIC DEFAULT 0,
+  yarn_type TEXT,
+  packaging_type TEXT,
+  bags_cartons NUMERIC DEFAULT 0,
+  cones NUMERIC DEFAULT 0,
+  gross_weight_kg NUMERIC DEFAULT 0,
+  tare_weight_kg NUMERIC DEFAULT 0,
+  net_weight_kg NUMERIC DEFAULT 0,
+  net_weight_lbs NUMERIC DEFAULT 0,
+  vehicle_driver TEXT,
+  issued_by TEXT,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -163,20 +178,22 @@ CREATE TABLE IF NOT EXISTS yarn_issues (
 CREATE TABLE IF NOT EXISTS hvi_reports (
   id BIGINT PRIMARY KEY,
   test_date TEXT NOT NULL,
-  consignment TEXT NOT NULL,
-  mic NUMERIC DEFAULT 0,
-  uhml NUMERIC DEFAULT 0,
-  ui NUMERIC DEFAULT 0,
-  strength NUMERIC DEFAULT 0,
-  elongation NUMERIC DEFAULT 0,
-  sfi NUMERIC DEFAULT 0,
-  moisture NUMERIC DEFAULT 0,
-  rd NUMERIC DEFAULT 0,
-  yellowness NUMERIC DEFAULT 0,
-  color_grade TEXT,
-  trash_cnt NUMERIC DEFAULT 0,
-  trash_ar NUMERIC DEFAULT 0,
-  sci NUMERIC DEFAULT 0,
+  lot_no TEXT NOT NULL,
+  origin TEXT,
+  operator TEXT,
+  sample_size NUMERIC DEFAULT 0,
+  micronaire_avg NUMERIC DEFAULT 0,
+  length_mm_avg NUMERIC DEFAULT 0,
+  length_inch_avg NUMERIC DEFAULT 0,
+  uniformity_index_avg NUMERIC DEFAULT 0,
+  short_fiber_index_avg NUMERIC DEFAULT 0,
+  strength_gtex_avg NUMERIC DEFAULT 0,
+  elongation_avg NUMERIC DEFAULT 0,
+  rd_avg NUMERIC DEFAULT 0,
+  plus_b_avg NUMERIC DEFAULT 0,
+  trash_count_avg NUMERIC DEFAULT 0,
+  trash_area_avg NUMERIC DEFAULT 0,
+  sci_avg NUMERIC DEFAULT 0,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -185,18 +202,23 @@ CREATE TABLE IF NOT EXISTS hvi_reports (
 CREATE TABLE IF NOT EXISTS uster_reports (
   id BIGINT PRIMARY KEY,
   test_date TEXT NOT NULL,
+  count_ne TEXT,
   lot_no TEXT NOT NULL,
-  count TEXT NOT NULL,
-  process TEXT NOT NULL,
-  machine TEXT NOT NULL,
-  unevenness NUMERIC DEFAULT 0,
-  cvm NUMERIC DEFAULT 0,
-  thin_places NUMERIC DEFAULT 0,
-  thick_places NUMERIC DEFAULT 0,
-  neps NUMERIC DEFAULT 0,
-  ipi NUMERIC DEFAULT 0,
-  hairiness NUMERIC DEFAULT 0,
+  spindle_no TEXT,
+  machine_no TEXT,
+  operator TEXT,
+  actual_count_ne NUMERIC DEFAULT 0,
+  count_cv_pct NUMERIC DEFAULT 0,
+  lea_strength_lbs NUMERIC DEFAULT 0,
   csp NUMERIC DEFAULT 0,
+  unevenness_u NUMERIC DEFAULT 0,
+  cvm_pct NUMERIC DEFAULT 0,
+  thin_minus_50 NUMERIC DEFAULT 0,
+  thick_plus_50 NUMERIC DEFAULT 0,
+  neps_plus_200 NUMERIC DEFAULT 0,
+  ipi_total NUMERIC DEFAULT 0,
+  hairiness_h NUMERIC DEFAULT 0,
+  sh NUMERIC DEFAULT 0,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -436,6 +458,117 @@ export async function syncCottonIssueToSupabase(item: CottonIssue): Promise<bool
   }
 }
 
+export async function deleteCottonIssueFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('cotton_issues').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Waste Receives
+export async function fetchWasteReceivesFromSupabase(): Promise<WasteReceive[] | null> {
+  try {
+    const { data, error } = await supabase.from('waste_receives').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      date: row.date,
+      category: row.category,
+      receiveFrom: row.receive_from,
+      quantity: Number(row.quantity || 0),
+      weightKg: Number(row.weight_kg || 0),
+      bales: Number(row.bales || 0),
+      receivedBy: row.received_by || '',
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncWasteReceiveToSupabase(item: WasteReceive): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('waste_receives').upsert({
+      id: item.id,
+      date: item.date,
+      category: item.category,
+      receive_from: item.receiveFrom,
+      quantity: item.quantity,
+      weight_kg: item.weightKg,
+      bales: item.bales,
+      received_by: item.receivedBy,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteWasteReceiveFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('waste_receives').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Waste Issues
+export async function fetchWasteIssuesFromSupabase(): Promise<WasteIssue[] | null> {
+  try {
+    const { data, error } = await supabase.from('waste_issues').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      srNo: row.sr_no,
+      date: row.date,
+      category: row.category,
+      issueTo: row.issue_to,
+      issueType: row.issue_type,
+      quantity: Number(row.quantity || 0),
+      weightKg: Number(row.weight_kg || 0),
+      bales: Number(row.bales || 0),
+      issuedBy: row.issued_by || '',
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncWasteIssueToSupabase(item: WasteIssue): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('waste_issues').upsert({
+      id: item.id,
+      sr_no: item.srNo,
+      date: item.date,
+      category: item.category,
+      issue_to: item.issueTo,
+      issue_type: item.issueType,
+      quantity: item.quantity,
+      weight_kg: item.weightKg,
+      bales: item.bales,
+      issued_by: item.issuedBy,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteWasteIssueFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('waste_issues').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 // Spare Items
 export async function fetchSpareItemsFromSupabase(): Promise<SpareItem[] | null> {
   try {
@@ -472,6 +605,335 @@ export async function syncSpareItemToSupabase(item: SpareItem): Promise<boolean>
       unit: item.unit,
       location: item.location,
     });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSpareItemFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('spare_items').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Spare Receives
+export async function fetchSpareReceivesFromSupabase(): Promise<SpareReceive[] | null> {
+  try {
+    const { data, error } = await supabase.from('spare_receives').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      itemId: Number(row.item_id),
+      mrrNo: row.mrr_no,
+      date: row.date,
+      quantity: Number(row.quantity || 0),
+      unit: row.unit,
+      receivedBy: row.received_by || '',
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncSpareReceiveToSupabase(item: SpareReceive): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('spare_receives').upsert({
+      id: item.id,
+      item_id: item.itemId,
+      mrr_no: item.mrrNo,
+      date: item.date,
+      quantity: item.quantity,
+      unit: item.unit,
+      received_by: item.receivedBy,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSpareReceiveFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('spare_receives').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Spare Issues
+export async function fetchSpareIssuesFromSupabase(): Promise<SpareIssue[] | null> {
+  try {
+    const { data, error } = await supabase.from('spare_issues').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      itemId: Number(row.item_id),
+      srNo: row.sr_no,
+      date: row.date,
+      quantity: Number(row.quantity || 0),
+      unit: row.unit || 'Pcs',
+      issueTo: row.issue_to,
+      issuedBy: row.issued_by || '',
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncSpareIssueToSupabase(item: SpareIssue): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('spare_issues').upsert({
+      id: item.id,
+      item_id: item.itemId,
+      sr_no: item.srNo,
+      date: item.date,
+      quantity: item.quantity,
+      unit: item.unit,
+      issue_to: item.issueTo,
+      issued_by: item.issuedBy,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSpareIssueFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('spare_issues').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Yarn Receives
+export async function fetchYarnReceivesFromSupabase(): Promise<YarnReceive[] | null> {
+  try {
+    const { data, error } = await supabase.from('yarn_receives').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      date: row.date,
+      count: row.count,
+      lotNo: row.lot_no,
+      process: row.process as 'Ring' | 'Rotor',
+      mixingRatio: row.mixing_ratio || '',
+      quantity: Number(row.quantity || 0),
+      bags: Number(row.bags || 0),
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncYarnReceiveToSupabase(item: YarnReceive): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('yarn_receives').upsert({
+      id: item.id,
+      date: item.date,
+      count: item.count,
+      lot_no: item.lotNo,
+      process: item.process,
+      mixing_ratio: item.mixingRatio,
+      quantity: item.quantity,
+      bags: item.bags,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteYarnReceiveFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('yarn_receives').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Yarn Issues
+export async function fetchYarnIssuesFromSupabase(): Promise<YarnIssue[] | null> {
+  try {
+    const { data, error } = await supabase.from('yarn_issues').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      date: row.date,
+      count: row.count,
+      lotNo: row.lot_no,
+      process: row.process as 'Ring' | 'Rotor',
+      issueTo: row.issue_to,
+      quantity: Number(row.quantity || 0),
+      bags: Number(row.bags || 0),
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncYarnIssueToSupabase(item: YarnIssue): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('yarn_issues').upsert({
+      id: item.id,
+      date: item.date,
+      count: item.count,
+      lot_no: item.lotNo,
+      process: item.process,
+      issue_to: item.issueTo,
+      quantity: item.quantity,
+      bags: item.bags,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteYarnIssueFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('yarn_issues').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// HVI Reports
+export async function fetchHviReportsFromSupabase(): Promise<HVIReport[] | null> {
+  try {
+    const { data, error } = await supabase.from('hvi_reports').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      testDate: row.test_date,
+      consignment: row.consignment,
+      mic: Number(row.mic || 0),
+      uhml: Number(row.uhml || 0),
+      ui: Number(row.ui || 0),
+      strength: Number(row.strength || 0),
+      elongation: Number(row.elongation || 0),
+      sfi: Number(row.sfi || 0),
+      moisture: Number(row.moisture || 0),
+      rd: Number(row.rd || 0),
+      yellowness: Number(row.yellowness || 0),
+      colorGrade: row.color_grade || '',
+      trashCnt: Number(row.trash_cnt || 0),
+      trashAr: Number(row.trash_ar || 0),
+      sci: Number(row.sci || 0),
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncHviReportToSupabase(item: HVIReport): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('hvi_reports').upsert({
+      id: item.id,
+      test_date: item.testDate,
+      consignment: item.consignment,
+      mic: item.mic,
+      uhml: item.uhml,
+      ui: item.ui,
+      strength: item.strength,
+      elongation: item.elongation,
+      sfi: item.sfi,
+      moisture: item.moisture,
+      rd: item.rd,
+      yellowness: item.yellowness,
+      color_grade: item.colorGrade,
+      trash_cnt: item.trashCnt,
+      trash_ar: item.trashAr,
+      sci: item.sci,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteHviReportFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('hvi_reports').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Uster Reports
+export async function fetchUsterReportsFromSupabase(): Promise<UsterReport[] | null> {
+  try {
+    const { data, error } = await supabase.from('uster_reports').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      testDate: row.test_date,
+      lotNo: row.lot_no,
+      count: row.count,
+      process: row.process as 'Ring' | 'Rotor',
+      machine: row.machine,
+      unevenness: Number(row.unevenness || 0),
+      cvm: Number(row.cvm || 0),
+      thinPlaces: Number(row.thin_places || 0),
+      thickPlaces: Number(row.thick_places || 0),
+      neps: Number(row.neps || 0),
+      ipi: Number(row.ipi || 0),
+      hairiness: Number(row.hairiness || 0),
+      csp: Number(row.csp || 0),
+      remarks: row.remarks || '',
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncUsterReportToSupabase(item: UsterReport): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('uster_reports').upsert({
+      id: item.id,
+      test_date: item.testDate,
+      lot_no: item.lotNo,
+      count: item.count,
+      process: item.process,
+      machine: item.machine,
+      unevenness: item.unevenness,
+      cvm: item.cvm,
+      thin_places: item.thinPlaces,
+      thick_places: item.thickPlaces,
+      neps: item.neps,
+      ipi: item.ipi,
+      hairiness: item.hairiness,
+      csp: item.csp,
+      remarks: item.remarks,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteUsterReportFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('uster_reports').delete().eq('id', id);
     return !error;
   } catch {
     return false;
@@ -608,43 +1070,125 @@ export async function syncSampleItemToSupabase(item: SampleItem): Promise<boolea
  * Seed initial mill data into Supabase if tables are currently empty
  */
 export async function populateSupabaseWithInitialSeedData(seedData: {
-  cottonReceives: CottonReceive[];
-  cottonIssues: CottonIssue[];
-  spareItems: SpareItem[];
-  auditItems: AuditItem[];
-  sampleItems: SampleItem[];
+  cottonReceives?: CottonReceive[];
+  cottonIssues?: CottonIssue[];
+  wasteReceives?: WasteReceive[];
+  wasteIssues?: WasteIssue[];
+  spareItems?: SpareItem[];
+  spareReceives?: SpareReceive[];
+  spareIssues?: SpareIssue[];
+  yarnReceives?: YarnReceive[];
+  yarnIssues?: YarnIssue[];
+  hviReports?: HVIReport[];
+  usterReports?: UsterReport[];
+  auditItems?: AuditItem[];
+  sampleItems?: SampleItem[];
 }): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     let syncedCount = 0;
     
     // Sync Cotton Receives
-    for (const item of seedData.cottonReceives) {
-      const ok = await syncCottonReceiveToSupabase(item);
-      if (ok) syncedCount++;
+    if (seedData.cottonReceives) {
+      for (const item of seedData.cottonReceives) {
+        const ok = await syncCottonReceiveToSupabase(item);
+        if (ok) syncedCount++;
+      }
     }
 
     // Sync Cotton Issues
-    for (const item of seedData.cottonIssues) {
-      const ok = await syncCottonIssueToSupabase(item);
-      if (ok) syncedCount++;
+    if (seedData.cottonIssues) {
+      for (const item of seedData.cottonIssues) {
+        const ok = await syncCottonIssueToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync Waste Receives
+    if (seedData.wasteReceives) {
+      for (const item of seedData.wasteReceives) {
+        const ok = await syncWasteReceiveToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync Waste Issues
+    if (seedData.wasteIssues) {
+      for (const item of seedData.wasteIssues) {
+        const ok = await syncWasteIssueToSupabase(item);
+        if (ok) syncedCount++;
+      }
     }
 
     // Sync Spare Items
-    for (const item of seedData.spareItems) {
-      const ok = await syncSpareItemToSupabase(item);
-      if (ok) syncedCount++;
+    if (seedData.spareItems) {
+      for (const item of seedData.spareItems) {
+        const ok = await syncSpareItemToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync Spare Receives
+    if (seedData.spareReceives) {
+      for (const item of seedData.spareReceives) {
+        const ok = await syncSpareReceiveToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync Spare Issues
+    if (seedData.spareIssues) {
+      for (const item of seedData.spareIssues) {
+        const ok = await syncSpareIssueToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync Yarn Receives
+    if (seedData.yarnReceives) {
+      for (const item of seedData.yarnReceives) {
+        const ok = await syncYarnReceiveToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync Yarn Issues
+    if (seedData.yarnIssues) {
+      for (const item of seedData.yarnIssues) {
+        const ok = await syncYarnIssueToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync HVI Reports
+    if (seedData.hviReports) {
+      for (const item of seedData.hviReports) {
+        const ok = await syncHviReportToSupabase(item);
+        if (ok) syncedCount++;
+      }
+    }
+
+    // Sync Uster Reports
+    if (seedData.usterReports) {
+      for (const item of seedData.usterReports) {
+        const ok = await syncUsterReportToSupabase(item);
+        if (ok) syncedCount++;
+      }
     }
 
     // Sync Audit Items
-    for (const item of seedData.auditItems) {
-      const ok = await syncAuditItemToSupabase(item);
-      if (ok) syncedCount++;
+    if (seedData.auditItems) {
+      for (const item of seedData.auditItems) {
+        const ok = await syncAuditItemToSupabase(item);
+        if (ok) syncedCount++;
+      }
     }
 
     // Sync Sample Items
-    for (const item of seedData.sampleItems) {
-      const ok = await syncSampleItemToSupabase(item);
-      if (ok) syncedCount++;
+    if (seedData.sampleItems) {
+      for (const item of seedData.sampleItems) {
+        const ok = await syncSampleItemToSupabase(item);
+        if (ok) syncedCount++;
+      }
     }
 
     return { success: true, count: syncedCount };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Role,
   User,
@@ -55,18 +55,54 @@ import { AuditModule } from './modules/AuditModule';
 import { SampleModule } from './modules/SampleModule';
 
 import {
+  supabase,
   fetchCottonReceivesFromSupabase,
   syncCottonReceiveToSupabase,
+  deleteCottonReceiveFromSupabase,
   fetchCottonIssuesFromSupabase,
   syncCottonIssueToSupabase,
+  deleteCottonIssueFromSupabase,
+  fetchWasteReceivesFromSupabase,
+  syncWasteReceiveToSupabase,
+  deleteWasteReceiveFromSupabase,
+  fetchWasteIssuesFromSupabase,
+  syncWasteIssueToSupabase,
+  deleteWasteIssueFromSupabase,
   fetchSpareItemsFromSupabase,
   syncSpareItemToSupabase,
+  deleteSpareItemFromSupabase,
+  fetchSpareReceivesFromSupabase,
+  syncSpareReceiveToSupabase,
+  deleteSpareReceiveFromSupabase,
+  fetchSpareIssuesFromSupabase,
+  syncSpareIssueToSupabase,
+  deleteSpareIssueFromSupabase,
+  fetchYarnReceivesFromSupabase,
+  syncYarnReceiveToSupabase,
+  deleteYarnReceiveFromSupabase,
+  fetchYarnIssuesFromSupabase,
+  syncYarnIssueToSupabase,
+  deleteYarnIssueFromSupabase,
+  fetchHviReportsFromSupabase,
+  syncHviReportToSupabase,
+  deleteHviReportFromSupabase,
+  fetchUsterReportsFromSupabase,
+  syncUsterReportToSupabase,
+  deleteUsterReportFromSupabase,
   fetchAuditItemsFromSupabase,
   syncAuditItemToSupabase,
   fetchSampleItemsFromSupabase,
   syncSampleItemToSupabase,
   populateSupabaseWithInitialSeedData,
 } from './lib/supabase';
+import {
+  mergeEntityList,
+  broadcastDataChange,
+  subscribeToBroadcast,
+  recordDeletedId,
+  exportErpBackup,
+  importErpBackup,
+} from './lib/syncEngine';
 
 export function App() {
   // Auth & Roles State
@@ -103,28 +139,89 @@ export function App() {
     action: null,
   });
 
-  // ERP Domain State (Initialized with mill seed data)
-  const [cottonCountries, setCottonCountries] = useState<string[]>(DEFAULT_COTTON_COUNTRIES);
-  const [cottonReceives, setCottonReceives] = useState<CottonReceive[]>(SEED_COTTON_RECEIVES);
-  const [cottonIssues, setCottonIssues] = useState<CottonIssue[]>(SEED_COTTON_ISSUES);
+  // Helper to load state safely from localStorage
+  const getInitialState = <T,>(key: string, fallback: T): T => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed as T;
+      }
+    } catch (e) {
+      console.warn(`Failed loading ${key} from localStorage`, e);
+    }
+    return fallback;
+  };
 
-  const [wasteCategories, setWasteCategories] = useState<string[]>(DEFAULT_WASTE_CATEGORIES);
-  const [wasteReceives, setWasteReceives] = useState<WasteReceive[]>(SEED_WASTE_RECEIVES);
-  const [wasteIssues, setWasteIssues] = useState<WasteIssue[]>(SEED_WASTE_ISSUES);
+  // ERP Domain State (Initialized with localStorage or mill seed data)
+  const [cottonCountries, setCottonCountries] = useState<string[]>(() =>
+    getInitialState('patriot_erp_cotton_countries', DEFAULT_COTTON_COUNTRIES)
+  );
+  const [cottonReceives, setCottonReceives] = useState<CottonReceive[]>(() =>
+    getInitialState('patriot_erp_cotton_receives', SEED_COTTON_RECEIVES)
+  );
+  const [cottonIssues, setCottonIssues] = useState<CottonIssue[]>(() =>
+    getInitialState('patriot_erp_cotton_issues', SEED_COTTON_ISSUES)
+  );
+
+  const [wasteCategories, setWasteCategories] = useState<string[]>(() =>
+    getInitialState('patriot_erp_waste_categories', DEFAULT_WASTE_CATEGORIES)
+  );
+  const [wasteReceives, setWasteReceives] = useState<WasteReceive[]>(() =>
+    getInitialState('patriot_erp_waste_receives', SEED_WASTE_RECEIVES)
+  );
+  const [wasteIssues, setWasteIssues] = useState<WasteIssue[]>(() =>
+    getInitialState('patriot_erp_waste_issues', SEED_WASTE_ISSUES)
+  );
 
   const [spareSections] = useState<string[]>(DEFAULT_SPARE_SECTIONS);
-  const [spareItems, setSpareItems] = useState<SpareItem[]>(SEED_SPARE_ITEMS);
-  const [spareReceives, setSpareReceives] = useState<SpareReceive[]>(SEED_SPARE_RECEIVES);
-  const [spareIssues, setSpareIssues] = useState<SpareIssue[]>(SEED_SPARE_ISSUES);
+  const [spareItems, setSpareItems] = useState<SpareItem[]>(() =>
+    getInitialState('patriot_erp_spare_items', SEED_SPARE_ITEMS)
+  );
+  const [spareReceives, setSpareReceives] = useState<SpareReceive[]>(() =>
+    getInitialState('patriot_erp_spare_receives', SEED_SPARE_RECEIVES)
+  );
+  const [spareIssues, setSpareIssues] = useState<SpareIssue[]>(() =>
+    getInitialState('patriot_erp_spare_issues', SEED_SPARE_ISSUES)
+  );
 
-  const [yarnReceives, setYarnReceives] = useState<YarnReceive[]>(SEED_YARN_RECEIVES);
-  const [yarnIssues, setYarnIssues] = useState<YarnIssue[]>(SEED_YARN_ISSUES);
+  const [yarnReceives, setYarnReceives] = useState<YarnReceive[]>(() =>
+    getInitialState('patriot_erp_yarn_receives', SEED_YARN_RECEIVES)
+  );
+  const [yarnIssues, setYarnIssues] = useState<YarnIssue[]>(() =>
+    getInitialState('patriot_erp_yarn_issues', SEED_YARN_ISSUES)
+  );
 
-  const [hviReports, setHviReports] = useState<HVIReport[]>(SEED_HVI_REPORTS);
-  const [usterReports, setUsterReports] = useState<UsterReport[]>(SEED_USTER_REPORTS);
+  const [hviReports, setHviReports] = useState<HVIReport[]>(() =>
+    getInitialState('patriot_erp_hvi_reports', SEED_HVI_REPORTS)
+  );
+  const [usterReports, setUsterReports] = useState<UsterReport[]>(() =>
+    getInitialState('patriot_erp_uster_reports', SEED_USTER_REPORTS)
+  );
 
-  const [auditItems, setAuditItems] = useState<AuditItem[]>(SEED_AUDIT_ITEMS);
-  const [sampleItems, setSampleItems] = useState<SampleItem[]>(SEED_SAMPLE_ITEMS);
+  const [auditItems, setAuditItems] = useState<AuditItem[]>(() =>
+    getInitialState('patriot_erp_audit_items', SEED_AUDIT_ITEMS)
+  );
+  const [sampleItems, setSampleItems] = useState<SampleItem[]>(() =>
+    getInitialState('patriot_erp_sample_items', SEED_SAMPLE_ITEMS)
+  );
+
+  // Synchronize state changes to localStorage
+  useEffect(() => { localStorage.setItem('patriot_erp_cotton_countries', JSON.stringify(cottonCountries)); }, [cottonCountries]);
+  useEffect(() => { localStorage.setItem('patriot_erp_cotton_receives', JSON.stringify(cottonReceives)); }, [cottonReceives]);
+  useEffect(() => { localStorage.setItem('patriot_erp_cotton_issues', JSON.stringify(cottonIssues)); }, [cottonIssues]);
+  useEffect(() => { localStorage.setItem('patriot_erp_waste_categories', JSON.stringify(wasteCategories)); }, [wasteCategories]);
+  useEffect(() => { localStorage.setItem('patriot_erp_waste_receives', JSON.stringify(wasteReceives)); }, [wasteReceives]);
+  useEffect(() => { localStorage.setItem('patriot_erp_waste_issues', JSON.stringify(wasteIssues)); }, [wasteIssues]);
+  useEffect(() => { localStorage.setItem('patriot_erp_spare_items', JSON.stringify(spareItems)); }, [spareItems]);
+  useEffect(() => { localStorage.setItem('patriot_erp_spare_receives', JSON.stringify(spareReceives)); }, [spareReceives]);
+  useEffect(() => { localStorage.setItem('patriot_erp_spare_issues', JSON.stringify(spareIssues)); }, [spareIssues]);
+  useEffect(() => { localStorage.setItem('patriot_erp_yarn_receives', JSON.stringify(yarnReceives)); }, [yarnReceives]);
+  useEffect(() => { localStorage.setItem('patriot_erp_yarn_issues', JSON.stringify(yarnIssues)); }, [yarnIssues]);
+  useEffect(() => { localStorage.setItem('patriot_erp_hvi_reports', JSON.stringify(hviReports)); }, [hviReports]);
+  useEffect(() => { localStorage.setItem('patriot_erp_uster_reports', JSON.stringify(usterReports)); }, [usterReports]);
+  useEffect(() => { localStorage.setItem('patriot_erp_audit_items', JSON.stringify(auditItems)); }, [auditItems]);
+  useEffect(() => { localStorage.setItem('patriot_erp_sample_items', JSON.stringify(sampleItems)); }, [sampleItems]);
 
   // Toggle Dark Mode Class on Document Elements
   useEffect(() => {
@@ -135,30 +232,191 @@ export function App() {
     }
   }, [darkMode]);
 
-  // Load initial data from Supabase Cloud Database on boot
-  useEffect(() => {
-    async function loadSupabaseData() {
-      try {
-        const [crData, ciData, spData, auData, smData] = await Promise.all([
-          fetchCottonReceivesFromSupabase(),
-          fetchCottonIssuesFromSupabase(),
-          fetchSpareItemsFromSupabase(),
-          fetchAuditItemsFromSupabase(),
-          fetchSampleItemsFromSupabase(),
-        ]);
+  // Non-destructive synchronization from Supabase Cloud Database
+  const loadSupabaseData = useCallback(async () => {
+    try {
+      const [
+        crData,
+        ciData,
+        wrData,
+        wiData,
+        spData,
+        srData,
+        siData,
+        yrData,
+        yiData,
+        hviData,
+        usterData,
+        auData,
+        smData,
+      ] = await Promise.all([
+        fetchCottonReceivesFromSupabase(),
+        fetchCottonIssuesFromSupabase(),
+        fetchWasteReceivesFromSupabase(),
+        fetchWasteIssuesFromSupabase(),
+        fetchSpareItemsFromSupabase(),
+        fetchSpareReceivesFromSupabase(),
+        fetchSpareIssuesFromSupabase(),
+        fetchYarnReceivesFromSupabase(),
+        fetchYarnIssuesFromSupabase(),
+        fetchHviReportsFromSupabase(),
+        fetchUsterReportsFromSupabase(),
+        fetchAuditItemsFromSupabase(),
+        fetchSampleItemsFromSupabase(),
+      ]);
 
-        if (crData && crData.length > 0) setCottonReceives(crData);
-        if (ciData && ciData.length > 0) setCottonIssues(ciData);
-        if (spData && spData.length > 0) setSpareItems(spData);
-        if (auData && auData.length > 0) setAuditItems(auData);
-        if (smData && smData.length > 0) setSampleItems(smData);
-      } catch (err) {
-        console.info('Supabase initial fetch notice:', err);
+      if (crData && crData.length > 0) setCottonReceives((prev) => mergeEntityList(prev, crData));
+      if (ciData && ciData.length > 0) setCottonIssues((prev) => mergeEntityList(prev, ciData));
+      if (wrData && wrData.length > 0) setWasteReceives((prev) => mergeEntityList(prev, wrData));
+      if (wiData && wiData.length > 0) setWasteIssues((prev) => mergeEntityList(prev, wiData));
+      if (spData && spData.length > 0) setSpareItems((prev) => mergeEntityList(prev, spData));
+      if (srData && srData.length > 0) setSpareReceives((prev) => mergeEntityList(prev, srData));
+      if (siData && siData.length > 0) setSpareIssues((prev) => mergeEntityList(prev, siData));
+      if (yrData && yrData.length > 0) setYarnReceives((prev) => mergeEntityList(prev, yrData));
+      if (yiData && yiData.length > 0) setYarnIssues((prev) => mergeEntityList(prev, yiData));
+      if (hviData && hviData.length > 0) setHviReports((prev) => mergeEntityList(prev, hviData));
+      if (usterData && usterData.length > 0) setUsterReports((prev) => mergeEntityList(prev, usterData));
+      if (auData && auData.length > 0) setAuditItems((prev) => mergeEntityList(prev, auData));
+      if (smData && smData.length > 0) setSampleItems((prev) => mergeEntityList(prev, smData));
+    } catch (err) {
+      console.info('Supabase non-blocking sync note:', err);
+    }
+  }, []);
+
+  // Periodic polling & focus sync & Realtime channel
+  useEffect(() => {
+    loadSupabaseData();
+
+    // Setup fast 5s background auto-sync interval and on focus
+    const interval = setInterval(loadSupabaseData, 5000);
+    const handleFocus = () => loadSupabaseData();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadSupabaseData();
       }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Setup Supabase Realtime channel subscription
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel('patriot_erp_realtime_sync')
+        .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+          loadSupabaseData();
+        })
+        .subscribe();
+    } catch {
+      // ignore
     }
 
-    loadSupabaseData();
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [loadSupabaseData]);
+
+  // Listen to multi-tab BroadcastChannel and cross-tab storage changes
+  useEffect(() => {
+    const handleDataUpdate = (key: string, parsed: any) => {
+      if (!parsed || !Array.isArray(parsed)) return;
+      if (key === 'patriot_erp_cotton_receives') setCottonReceives(parsed);
+      if (key === 'patriot_erp_cotton_issues') setCottonIssues(parsed);
+      if (key === 'patriot_erp_waste_receives') setWasteReceives(parsed);
+      if (key === 'patriot_erp_waste_issues') setWasteIssues(parsed);
+      if (key === 'patriot_erp_spare_items') setSpareItems(parsed);
+      if (key === 'patriot_erp_spare_receives') setSpareReceives(parsed);
+      if (key === 'patriot_erp_spare_issues') setSpareIssues(parsed);
+      if (key === 'patriot_erp_yarn_receives') setYarnReceives(parsed);
+      if (key === 'patriot_erp_yarn_issues') setYarnIssues(parsed);
+      if (key === 'patriot_erp_hvi_reports') setHviReports(parsed);
+      if (key === 'patriot_erp_uster_reports') setUsterReports(parsed);
+      if (key === 'patriot_erp_audit_items') setAuditItems(parsed);
+      if (key === 'patriot_erp_sample_items') setSampleItems(parsed);
+    };
+
+    // 1. StorageEvent listener
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || !e.newValue) return;
+      try {
+        const parsed = JSON.parse(e.newValue);
+        handleDataUpdate(e.key, parsed);
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // 2. BroadcastChannel listener
+    const unsubscribeBroadcast = subscribeToBroadcast((key, data) => {
+      handleDataUpdate(key, data);
+    });
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      unsubscribeBroadcast();
+    };
   }, []);
+
+  // Export Full JSON Backup
+  const handleExportBackup = () => {
+    const backupData = {
+      version: '1.0.0',
+      exportedAt: new Date().toISOString(),
+      millName: 'Patriot Spinning Mills Ltd.',
+      cottonCountries,
+      cottonReceives,
+      cottonIssues,
+      wasteCategories,
+      wasteReceives,
+      wasteIssues,
+      spareSections,
+      spareItems,
+      spareReceives,
+      spareIssues,
+      yarnReceives,
+      yarnIssues,
+      hviReports,
+      usterReports,
+      auditItems,
+      sampleItems,
+    };
+    exportErpBackup(backupData);
+    showToast('success', 'Backup Exported', 'Full mill database downloaded as JSON backup.');
+  };
+
+  // Import JSON Backup
+  const handleImportBackup = async (file: File) => {
+    try {
+      const data = await importErpBackup(file);
+      if (data.cottonReceives && Array.isArray(data.cottonReceives)) setCottonReceives(data.cottonReceives);
+      if (data.cottonIssues && Array.isArray(data.cottonIssues)) setCottonIssues(data.cottonIssues);
+      if (data.wasteReceives && Array.isArray(data.wasteReceives)) setWasteReceives(data.wasteReceives);
+      if (data.wasteIssues && Array.isArray(data.wasteIssues)) setWasteIssues(data.wasteIssues);
+      if (data.spareItems && Array.isArray(data.spareItems)) setSpareItems(data.spareItems);
+      if (data.spareReceives && Array.isArray(data.spareReceives)) setSpareReceives(data.spareReceives);
+      if (data.spareIssues && Array.isArray(data.spareIssues)) setSpareIssues(data.spareIssues);
+      if (data.yarnReceives && Array.isArray(data.yarnReceives)) setYarnReceives(data.yarnReceives);
+      if (data.yarnIssues && Array.isArray(data.yarnIssues)) setYarnIssues(data.yarnIssues);
+      if (data.hviReports && Array.isArray(data.hviReports)) setHviReports(data.hviReports);
+      if (data.usterReports && Array.isArray(data.usterReports)) setUsterReports(data.usterReports);
+      if (data.auditItems && Array.isArray(data.auditItems)) setAuditItems(data.auditItems);
+      if (data.sampleItems && Array.isArray(data.sampleItems)) setSampleItems(data.sampleItems);
+
+      showToast('success', 'Backup Restored', 'All mill records imported successfully from JSON file.');
+    } catch (err: any) {
+      showToast('error', 'Import Failed', err?.message || 'Could not parse JSON backup file.');
+    }
+  };
 
   // Supabase Database Seed Handler
   const handleSeedSupabase = async () => {
@@ -166,7 +424,15 @@ export function App() {
     const result = await populateSupabaseWithInitialSeedData({
       cottonReceives,
       cottonIssues,
+      wasteReceives,
+      wasteIssues,
       spareItems,
+      spareReceives,
+      spareIssues,
+      yarnReceives,
+      yarnIssues,
+      hviReports,
+      usterReports,
       auditItems,
       sampleItems,
     });
@@ -178,15 +444,23 @@ export function App() {
     }
   };
 
-  // Wrapped State Setters that sync updates to Supabase
+  // Wrapped State Setters that sync updates to Supabase Cloud Database and Broadcast
   const handleSetCottonReceives: React.Dispatch<React.SetStateAction<CottonReceive[]>> = (action) => {
     setCottonReceives((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      // Sync newly added or updated items to Supabase
-      if (next.length > 0) {
-        const latest = next[0];
-        syncCottonReceiveToSupabase(latest);
-      }
+      broadcastDataChange('patriot_erp_cotton_receives', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncCottonReceiveToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteCottonReceiveFromSupabase(old.id);
+        }
+      });
       return next;
     });
   };
@@ -194,10 +468,59 @@ export function App() {
   const handleSetCottonIssues: React.Dispatch<React.SetStateAction<CottonIssue[]>> = (action) => {
     setCottonIssues((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      if (next.length > 0) {
-        const latest = next[0];
-        syncCottonIssueToSupabase(latest);
-      }
+      broadcastDataChange('patriot_erp_cotton_issues', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncCottonIssueToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteCottonIssueFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetWasteReceives: React.Dispatch<React.SetStateAction<WasteReceive[]>> = (action) => {
+    setWasteReceives((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_waste_receives', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncWasteReceiveToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteWasteReceiveFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetWasteIssues: React.Dispatch<React.SetStateAction<WasteIssue[]>> = (action) => {
+    setWasteIssues((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_waste_issues', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncWasteIssueToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteWasteIssueFromSupabase(old.id);
+        }
+      });
       return next;
     });
   };
@@ -205,10 +528,139 @@ export function App() {
   const handleSetSpareItems: React.Dispatch<React.SetStateAction<SpareItem[]>> = (action) => {
     setSpareItems((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      if (next.length > 0) {
-        const latest = next[next.length - 1];
-        syncSpareItemToSupabase(latest);
-      }
+      broadcastDataChange('patriot_erp_spare_items', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncSpareItemToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteSpareItemFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetSpareReceives: React.Dispatch<React.SetStateAction<SpareReceive[]>> = (action) => {
+    setSpareReceives((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_spare_receives', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncSpareReceiveToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteSpareReceiveFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetSpareIssues: React.Dispatch<React.SetStateAction<SpareIssue[]>> = (action) => {
+    setSpareIssues((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_spare_issues', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncSpareIssueToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteSpareIssueFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetYarnReceives: React.Dispatch<React.SetStateAction<YarnReceive[]>> = (action) => {
+    setYarnReceives((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_yarn_receives', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncYarnReceiveToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteYarnReceiveFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetYarnIssues: React.Dispatch<React.SetStateAction<YarnIssue[]>> = (action) => {
+    setYarnIssues((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_yarn_issues', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncYarnIssueToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteYarnIssueFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetHviReports: React.Dispatch<React.SetStateAction<HVIReport[]>> = (action) => {
+    setHviReports((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_hvi_reports', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncHviReportToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteHviReportFromSupabase(old.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetUsterReports: React.Dispatch<React.SetStateAction<UsterReport[]>> = (action) => {
+    setUsterReports((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_uster_reports', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncUsterReportToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteUsterReportFromSupabase(old.id);
+        }
+      });
       return next;
     });
   };
@@ -216,10 +668,13 @@ export function App() {
   const handleSetAuditItems: React.Dispatch<React.SetStateAction<AuditItem[]>> = (action) => {
     setAuditItems((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      if (next.length > 0) {
-        const latest = next[0];
-        syncAuditItemToSupabase(latest);
-      }
+      broadcastDataChange('patriot_erp_audit_items', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncAuditItemToSupabase(item);
+        }
+      });
       return next;
     });
   };
@@ -227,10 +682,13 @@ export function App() {
   const handleSetSampleItems: React.Dispatch<React.SetStateAction<SampleItem[]>> = (action) => {
     setSampleItems((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      if (next.length > 0) {
-        const latest = next[0];
-        syncSampleItemToSupabase(latest);
-      }
+      broadcastDataChange('patriot_erp_sample_items', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncSampleItemToSupabase(item);
+        }
+      });
       return next;
     });
   };
@@ -351,6 +809,8 @@ export function App() {
             showToast('info', 'Logged Out', 'You have been safely signed out.');
           }}
           onSeedSupabase={handleSeedSupabase}
+          onExportBackup={handleExportBackup}
+          onImportBackup={handleImportBackup}
         />
 
         {/* Content Workspace Area */}
@@ -388,9 +848,9 @@ export function App() {
               wasteCategories={wasteCategories}
               setWasteCategories={setWasteCategories}
               wasteReceives={wasteReceives}
-              setWasteReceives={setWasteReceives}
+              setWasteReceives={handleSetWasteReceives}
               wasteIssues={wasteIssues}
-              setWasteIssues={setWasteIssues}
+              setWasteIssues={handleSetWasteIssues}
               requestAdminAction={requestAdminAction}
               showToast={showToast}
             />
@@ -403,9 +863,9 @@ export function App() {
               spareItems={spareItems}
               setSpareItems={handleSetSpareItems}
               spareReceives={spareReceives}
-              setSpareReceives={setSpareReceives}
+              setSpareReceives={handleSetSpareReceives}
               spareIssues={spareIssues}
-              setSpareIssues={setSpareIssues}
+              setSpareIssues={handleSetSpareIssues}
               requestAdminAction={requestAdminAction}
               showToast={showToast}
             />
@@ -415,9 +875,9 @@ export function App() {
             <YarnModule
               subTab={subTab as any}
               yarnReceives={yarnReceives}
-              setYarnReceives={setYarnReceives}
+              setYarnReceives={handleSetYarnReceives}
               yarnIssues={yarnIssues}
-              setYarnIssues={setYarnIssues}
+              setYarnIssues={handleSetYarnIssues}
               requestAdminAction={requestAdminAction}
               showToast={showToast}
             />
@@ -427,9 +887,9 @@ export function App() {
             <QualityModule
               subTab={subTab as any}
               hviReports={hviReports}
-              setHviReports={setHviReports}
+              setHviReports={handleSetHviReports}
               usterReports={usterReports}
-              setUsterReports={setUsterReports}
+              setUsterReports={handleSetUsterReports}
               requestAdminAction={requestAdminAction}
               showToast={showToast}
             />

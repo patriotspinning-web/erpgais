@@ -1,5 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Sun, Moon, LogOut, ShieldCheck, User as UserIcon, ChevronDown, Database, Copy, Check, ExternalLink, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Sun,
+  Moon,
+  LogOut,
+  ShieldCheck,
+  ChevronDown,
+  Database,
+  Copy,
+  Check,
+  ExternalLink,
+  RefreshCw,
+  Download,
+  Upload,
+  HardDrive,
+  CloudCheck,
+} from 'lucide-react';
 import { ModuleType, User } from '../types';
 import { testSupabaseConnection, SUPABASE_SQL_SCHEMA } from '../lib/supabase';
 
@@ -10,7 +25,9 @@ interface HeaderProps {
   user: User | null;
   setUser: (user: User) => void;
   logout: () => void;
-  onSeedSupabase?: () => void;
+  onSeedSupabase?: () => Promise<void> | void;
+  onExportBackup?: () => void;
+  onImportBackup?: (file: File) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,6 +38,8 @@ export const Header: React.FC<HeaderProps> = ({
   setUser,
   logout,
   onSeedSupabase,
+  onExportBackup,
+  onImportBackup,
 }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
@@ -30,12 +49,24 @@ export const Header: React.FC<HeaderProps> = ({
   });
   const [copiedSql, setCopiedSql] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [isPushingSeed, setIsPushingSeed] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const checkConnection = async () => {
     setTestingConnection(true);
     const res = await testSupabaseConnection();
     setSupabaseStatus(res);
     setTestingConnection(false);
+  };
+
+  const handlePushSeedClick = async () => {
+    if (!onSeedSupabase || isPushingSeed) return;
+    setIsPushingSeed(true);
+    try {
+      await onSeedSupabase();
+    } finally {
+      setTimeout(() => setIsPushingSeed(false), 1200);
+    }
   };
 
   useEffect(() => {
@@ -72,6 +103,28 @@ export const Header: React.FC<HeaderProps> = ({
       }
     } catch (fallbackErr) {
       console.error('Fallback copy failed:', fallbackErr);
+    }
+  };
+
+  const downloadSqlFile = () => {
+    const blob = new Blob([SUPABASE_SQL_SCHEMA], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'patriot-erp-supabase-schema.sql';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onImportBackup) {
+      onImportBackup(file);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -142,21 +195,37 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Header Actions */}
-      <div className="flex items-center gap-3">
-        {/* Supabase Connection Status Button */}
-        <button
+      <div className="flex items-center gap-2.5">
+        {/* Direct Push Seed Data Button */}
+        {onSeedSupabase && (
+          <button
+            onClick={handlePushSeedClick}
+            disabled={isPushingSeed}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border shadow-sm transition ${
+              isPushingSeed
+                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300'
+                : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 border-transparent shadow-blue-500/20 active:scale-95'
+            }`}
+            title="Push and sync all local mill data to Supabase Cloud Database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isPushingSeed ? 'animate-spin' : ''}`} />
+            <span>{isPushingSeed ? 'Pushing Data...' : 'Push Seed Data'}</span>
+          </button>
+        )}
+
+        {/* Auto Sync Indicator */}
+        <div
           onClick={() => setSupabaseModalOpen(true)}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition ${
-            supabaseStatus.connected
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
-              : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:bg-amber-100'
-          }`}
-          title="Supabase Database Status & SQL Configuration"
+          className="cursor-pointer px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition"
+          title="Auto-Sync is continuously active. Click for DB settings/schema"
         >
           <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span className="hidden md:inline">Supabase Connected</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        </button>
+          <span className="hidden lg:inline text-[11px]">Auto Sync</span>
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        </div>
 
         {/* Role Badge */}
         <span
@@ -297,11 +366,55 @@ export const Header: React.FC<HeaderProps> = ({
               <p className="text-xs text-emerald-700 dark:text-emerald-300">{supabaseStatus.message}</p>
             </div>
 
+            {/* Backup & Restore Action */}
+            <div className="p-4 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                    <HardDrive className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    Offline Backup & Migration
+                  </p>
+                  <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                    Download full mill data as JSON file or restore onto any computer/browser
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {onExportBackup && (
+                  <button
+                    onClick={onExportBackup}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download JSON Backup
+                  </button>
+                )}
+                {onImportBackup && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileInputChange}
+                      accept=".json"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-white dark:bg-slate-700 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Restore from JSON Backup
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* Seed / Sync Action */}
             <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-2xl flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-blue-900 dark:text-blue-200">Database Auto-Sync & Seeding</p>
-                <p className="text-[11px] text-blue-700 dark:text-blue-300">Sync local mill records directly to Supabase tables</p>
+                <p className="text-[11px] text-blue-700 dark:text-blue-300">Sync all local mill records directly to Supabase tables</p>
               </div>
               {onSeedSupabase && (
                 <button
@@ -322,13 +435,22 @@ export const Header: React.FC<HeaderProps> = ({
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Supabase SQL Table Schema (Run in Supabase SQL Editor if creating fresh tables):
                 </label>
-                <button
-                  onClick={copySqlSchema}
-                  className="px-3 py-1 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:opacity-90"
-                >
-                  {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedSql ? 'Copied SQL!' : 'Copy SQL Schema'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={downloadSqlFile}
+                    className="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-slate-200"
+                    title="Download as .sql file"
+                  >
+                    <Download className="w-3 h-3" /> .SQL File
+                  </button>
+                  <button
+                    onClick={copySqlSchema}
+                    className="px-3 py-1 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:opacity-90"
+                  >
+                    {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedSql ? 'Copied SQL!' : 'Copy SQL Schema'}
+                  </button>
+                </div>
               </div>
               <pre className="p-3 bg-slate-900 text-slate-200 rounded-xl font-mono text-[11px] h-48 overflow-y-auto border border-slate-700">
                 {SUPABASE_SQL_SCHEMA}

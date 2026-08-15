@@ -36,8 +36,8 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: '/erpgais/'
-          VITE_SUPABASE_URL: 'https://zmcuzcabmwmoqcnrmdvj.supabase.co'
-          VITE_SUPABASE_ANON_KEY: 'sb_publishable_A7hfDJptyKVsk88fijBK6Q_DgxguWcb'
+          VITE_SUPABASE_URL: 'https://uegrjghtheviiswgoiuy.supabase.co'
+          VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlZ3JqZ2h0aGV2aWlzd2dvaXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNzQ1NjMsImV4cCI6MjEwMTc1MDU2M30.ORc7O5CIxPHotHkQZn20uOgsxxr-l-GPiLG9Wb_Vrfo'
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

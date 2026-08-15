@@ -13,10 +13,18 @@ import {
   Download,
   Upload,
   HardDrive,
-  CloudCheck,
+  Key,
+  Sliders,
+  AlertTriangle,
 } from 'lucide-react';
 import { ModuleType, User } from '../types';
-import { testSupabaseConnection, SUPABASE_SQL_SCHEMA } from '../lib/supabase';
+import {
+  testSupabaseConnection,
+  SUPABASE_SQL_SCHEMA,
+  getSavedSupabaseUrl,
+  getSavedSupabaseKey,
+  saveSupabaseConfig,
+} from '../lib/supabase';
 
 interface HeaderProps {
   currentModule: ModuleType;
@@ -50,13 +58,29 @@ export const Header: React.FC<HeaderProps> = ({
   const [copiedSql, setCopiedSql] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [isPushingSeed, setIsPushingSeed] = useState(false);
+  const [urlInput, setUrlInput] = useState(getSavedSupabaseUrl());
+  const [keyInput, setKeyInput] = useState(getSavedSupabaseKey());
+  const [showKeyConfig, setShowKeyConfig] = useState(false);
+  const [configSavedNotice, setConfigSavedNotice] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const projectRef = (urlInput.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1]) || 'uegrjghtheviiswgoiuy';
+  const apiDashboardUrl = `https://supabase.com/dashboard/project/${projectRef}/settings/api`;
+  const sqlDashboardUrl = `https://supabase.com/dashboard/project/${projectRef}/sql/new`;
 
   const checkConnection = async () => {
     setTestingConnection(true);
     const res = await testSupabaseConnection();
     setSupabaseStatus(res);
     setTestingConnection(false);
+  };
+
+  const handleSaveCredentials = async () => {
+    if (!urlInput.trim() || !keyInput.trim()) return;
+    saveSupabaseConfig(urlInput.trim(), keyInput.trim());
+    setConfigSavedNotice(true);
+    setTimeout(() => setConfigSavedNotice(false), 2500);
+    await checkConnection();
   };
 
   const handlePushSeedClick = async () => {
@@ -349,22 +373,109 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Connection Status Panel */}
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl space-y-2">
+            <div className={`p-4 rounded-2xl space-y-2 border ${
+              supabaseStatus.connected && !supabaseStatus.message.includes('Error') && !supabaseStatus.message.includes('NetworkError')
+                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60'
+                : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                  Supabase Status: Connected
+                <span className={`text-xs font-bold flex items-center gap-1.5 ${
+                  supabaseStatus.connected && !supabaseStatus.message.includes('Error') && !supabaseStatus.message.includes('NetworkError')
+                    ? 'text-emerald-800 dark:text-emerald-300'
+                    : 'text-amber-800 dark:text-amber-300'
+                }`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    supabaseStatus.connected && !supabaseStatus.message.includes('Error') && !supabaseStatus.message.includes('NetworkError')
+                      ? 'bg-emerald-500'
+                      : 'bg-amber-500 animate-ping'
+                  }`}></span>
+                  {supabaseStatus.connected && !supabaseStatus.message.includes('Error') && !supabaseStatus.message.includes('NetworkError')
+                    ? 'Supabase Status: Connected'
+                    : 'Supabase Status: Attention Needed'}
                 </span>
-                <button
-                  onClick={checkConnection}
-                  disabled={testingConnection}
-                  className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 flex items-center gap-1"
-                >
-                  <RefreshCw className={`w-3 h-3 ${testingConnection ? 'animate-spin' : ''}`} /> Test
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowKeyConfig(!showKeyConfig)}
+                    className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 flex items-center gap-1"
+                  >
+                    <Sliders className="w-3 h-3" /> {showKeyConfig ? 'Hide Config' : 'Edit Credentials'}
+                  </button>
+                  <button
+                    onClick={checkConnection}
+                    disabled={testingConnection}
+                    className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 flex items-center gap-1"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${testingConnection ? 'animate-spin' : ''}`} /> Test
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-emerald-700 dark:text-emerald-300">{supabaseStatus.message}</p>
+              <p className={`text-xs ${
+                supabaseStatus.connected && !supabaseStatus.message.includes('Error') && !supabaseStatus.message.includes('NetworkError')
+                  ? 'text-emerald-700 dark:text-emerald-300'
+                  : 'text-amber-700 dark:text-amber-300'
+              }`}>{supabaseStatus.message}</p>
             </div>
+
+            {/* Editable API Credentials Box */}
+            {showKeyConfig && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Key className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    Supabase Project API Credentials
+                  </p>
+                  <a
+                    href={apiDashboardUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    Get Anon Key from Dashboard <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                      Supabase Project URL
+                    </label>
+                    <input
+                      type="text"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      placeholder="https://your-project.supabase.co"
+                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                      Supabase Public / Anon API Key
+                    </label>
+                    <input
+                      type="text"
+                      value={keyInput}
+                      onChange={(e) => setKeyInput(e.target.value)}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-900 dark:text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-[11px] text-slate-500">
+                    💡 You can find this in Supabase Dashboard → <b>Project Settings → API → anon/public key</b>.
+                  </p>
+                  <button
+                    onClick={handleSaveCredentials}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow"
+                  >
+                    {configSavedNotice ? <Check className="w-3.5 h-3.5" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    {configSavedNotice ? 'Saved & Reconnected!' : 'Save & Reconnect'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Backup & Restore Action */}
             <div className="p-4 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 rounded-2xl space-y-3">
@@ -459,7 +570,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="flex items-center justify-between pt-2">
               <a
-                href="https://supabase.com/dashboard/project/zmcuzcabmwmoqcnrmdvj/sql/new"
+                href={sqlDashboardUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center gap-1"

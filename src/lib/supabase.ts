@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   CottonReceive,
   CottonIssue,
@@ -15,11 +15,46 @@ import {
   SampleItem,
 } from '../types';
 
-const env = (import.meta as any).env || {};
-const supabaseUrl = env.VITE_SUPABASE_URL || 'https://zmcuzcabmwmoqcnrmdvj.supabase.co';
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_A7hfDJptyKVsk88fijBK6Q_DgxguWcb';
+export function getSavedSupabaseUrl(): string {
+  try {
+    const local = localStorage.getItem('patriot_erp_supabase_url');
+    if (local && local.trim()) return local.trim();
+  } catch {
+    // ignore
+  }
+  const env = (import.meta as any).env || {};
+  return env.VITE_SUPABASE_URL || 'https://uegrjghtheviiswgoiuy.supabase.co';
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export function getSavedSupabaseKey(): string {
+  try {
+    const local = localStorage.getItem('patriot_erp_supabase_key');
+    if (local && local.trim()) return local.trim();
+  } catch {
+    // ignore
+  }
+  const env = (import.meta as any).env || {};
+  return env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_A7hfDJptyKVsk88fijBK6Q_DgxguWcb';
+}
+
+let activeClient: SupabaseClient = createClient(getSavedSupabaseUrl(), getSavedSupabaseKey());
+
+export function saveSupabaseConfig(url: string, key: string): void {
+  try {
+    localStorage.setItem('patriot_erp_supabase_url', url.trim());
+    localStorage.setItem('patriot_erp_supabase_key', key.trim());
+  } catch {
+    // ignore
+  }
+  activeClient = createClient(url.trim(), key.trim());
+}
+
+export const supabase: SupabaseClient = new Proxy({} as any, {
+  get(_target, prop) {
+    const val = (activeClient as any)[prop];
+    return typeof val === 'function' ? val.bind(activeClient) : val;
+  },
+});
 
 /**
  * SQL Schema definition for Supabase SQL Editor execution
@@ -134,20 +169,13 @@ CREATE TABLE IF NOT EXISTS spare_issues (
 -- 8. Yarn Receives Table
 CREATE TABLE IF NOT EXISTS yarn_receives (
   id BIGINT PRIMARY KEY,
-  mrr_no TEXT,
   date TEXT NOT NULL,
-  shift TEXT,
-  yarn_type TEXT,
   count TEXT NOT NULL,
   lot_no TEXT NOT NULL,
-  packaging_type TEXT,
-  bags_cartons NUMERIC DEFAULT 0,
-  cones NUMERIC DEFAULT 0,
-  gross_weight_kg NUMERIC DEFAULT 0,
-  tare_weight_kg NUMERIC DEFAULT 0,
-  net_weight_kg NUMERIC DEFAULT 0,
-  net_weight_lbs NUMERIC DEFAULT 0,
-  received_by TEXT,
+  process TEXT NOT NULL,
+  mixing_ratio TEXT,
+  quantity NUMERIC DEFAULT 0,
+  bags NUMERIC DEFAULT 0,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -155,21 +183,13 @@ CREATE TABLE IF NOT EXISTS yarn_receives (
 -- 9. Yarn Issues Table
 CREATE TABLE IF NOT EXISTS yarn_issues (
   id BIGINT PRIMARY KEY,
-  delivery_challan_no TEXT,
   date TEXT NOT NULL,
-  buyer_party TEXT,
   count TEXT NOT NULL,
   lot_no TEXT NOT NULL,
-  yarn_type TEXT,
-  packaging_type TEXT,
-  bags_cartons NUMERIC DEFAULT 0,
-  cones NUMERIC DEFAULT 0,
-  gross_weight_kg NUMERIC DEFAULT 0,
-  tare_weight_kg NUMERIC DEFAULT 0,
-  net_weight_kg NUMERIC DEFAULT 0,
-  net_weight_lbs NUMERIC DEFAULT 0,
-  vehicle_driver TEXT,
-  issued_by TEXT,
+  process TEXT NOT NULL,
+  issue_to TEXT NOT NULL,
+  quantity NUMERIC DEFAULT 0,
+  bags NUMERIC DEFAULT 0,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -178,22 +198,20 @@ CREATE TABLE IF NOT EXISTS yarn_issues (
 CREATE TABLE IF NOT EXISTS hvi_reports (
   id BIGINT PRIMARY KEY,
   test_date TEXT NOT NULL,
-  lot_no TEXT NOT NULL,
-  origin TEXT,
-  operator TEXT,
-  sample_size NUMERIC DEFAULT 0,
-  micronaire_avg NUMERIC DEFAULT 0,
-  length_mm_avg NUMERIC DEFAULT 0,
-  length_inch_avg NUMERIC DEFAULT 0,
-  uniformity_index_avg NUMERIC DEFAULT 0,
-  short_fiber_index_avg NUMERIC DEFAULT 0,
-  strength_gtex_avg NUMERIC DEFAULT 0,
-  elongation_avg NUMERIC DEFAULT 0,
-  rd_avg NUMERIC DEFAULT 0,
-  plus_b_avg NUMERIC DEFAULT 0,
-  trash_count_avg NUMERIC DEFAULT 0,
-  trash_area_avg NUMERIC DEFAULT 0,
-  sci_avg NUMERIC DEFAULT 0,
+  consignment TEXT NOT NULL,
+  mic NUMERIC DEFAULT 0,
+  uhml NUMERIC DEFAULT 0,
+  ui NUMERIC DEFAULT 0,
+  strength NUMERIC DEFAULT 0,
+  elongation NUMERIC DEFAULT 0,
+  sfi NUMERIC DEFAULT 0,
+  moisture NUMERIC DEFAULT 0,
+  rd NUMERIC DEFAULT 0,
+  yellowness NUMERIC DEFAULT 0,
+  color_grade TEXT,
+  trash_cnt NUMERIC DEFAULT 0,
+  trash_ar NUMERIC DEFAULT 0,
+  sci NUMERIC DEFAULT 0,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -202,23 +220,18 @@ CREATE TABLE IF NOT EXISTS hvi_reports (
 CREATE TABLE IF NOT EXISTS uster_reports (
   id BIGINT PRIMARY KEY,
   test_date TEXT NOT NULL,
-  count_ne TEXT,
   lot_no TEXT NOT NULL,
-  spindle_no TEXT,
-  machine_no TEXT,
-  operator TEXT,
-  actual_count_ne NUMERIC DEFAULT 0,
-  count_cv_pct NUMERIC DEFAULT 0,
-  lea_strength_lbs NUMERIC DEFAULT 0,
+  count TEXT NOT NULL,
+  process TEXT NOT NULL,
+  machine TEXT NOT NULL,
+  unevenness NUMERIC DEFAULT 0,
+  cvm NUMERIC DEFAULT 0,
+  thin_places NUMERIC DEFAULT 0,
+  thick_places NUMERIC DEFAULT 0,
+  neps NUMERIC DEFAULT 0,
+  ipi NUMERIC DEFAULT 0,
+  hairiness NUMERIC DEFAULT 0,
   csp NUMERIC DEFAULT 0,
-  unevenness_u NUMERIC DEFAULT 0,
-  cvm_pct NUMERIC DEFAULT 0,
-  thin_minus_50 NUMERIC DEFAULT 0,
-  thick_plus_50 NUMERIC DEFAULT 0,
-  neps_plus_200 NUMERIC DEFAULT 0,
-  ipi_total NUMERIC DEFAULT 0,
-  hairiness_h NUMERIC DEFAULT 0,
-  sh NUMERIC DEFAULT 0,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -274,40 +287,25 @@ CREATE TABLE IF NOT EXISTS sample_items (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable Row Level Security (RLS) & Allow Anonymous Access for ERP
-ALTER TABLE cotton_receives ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cotton_issues ENABLE ROW LEVEL SECURITY;
-ALTER TABLE waste_receives ENABLE ROW LEVEL SECURITY;
-ALTER TABLE waste_issues ENABLE ROW LEVEL SECURITY;
-ALTER TABLE spare_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE spare_receives ENABLE ROW LEVEL SECURITY;
-ALTER TABLE spare_issues ENABLE ROW LEVEL SECURITY;
-ALTER TABLE yarn_receives ENABLE ROW LEVEL SECURITY;
-ALTER TABLE yarn_issues ENABLE ROW LEVEL SECURITY;
-ALTER TABLE hvi_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE uster_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sample_items ENABLE ROW LEVEL SECURITY;
+-- Disable Row Level Security (RLS) & Grant full access for seamless ERP sync
+ALTER TABLE cotton_receives DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cotton_issues DISABLE ROW LEVEL SECURITY;
+ALTER TABLE waste_receives DISABLE ROW LEVEL SECURITY;
+ALTER TABLE waste_issues DISABLE ROW LEVEL SECURITY;
+ALTER TABLE spare_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE spare_receives DISABLE ROW LEVEL SECURITY;
+ALTER TABLE spare_issues DISABLE ROW LEVEL SECURITY;
+ALTER TABLE yarn_receives DISABLE ROW LEVEL SECURITY;
+ALTER TABLE yarn_issues DISABLE ROW LEVEL SECURITY;
+ALTER TABLE hvi_reports DISABLE ROW LEVEL SECURITY;
+ALTER TABLE uster_reports DISABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE sample_items DISABLE ROW LEVEL SECURITY;
 
--- Create Open Policies for easy read/write in ERP demo environment
-DO $$ 
-BEGIN
-  CREATE POLICY "Public full access cotton_receives" ON cotton_receives FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access cotton_issues" ON cotton_issues FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access waste_receives" ON waste_receives FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access waste_issues" ON waste_issues FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access spare_items" ON spare_items FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access spare_receives" ON spare_receives FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access spare_issues" ON spare_issues FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access yarn_receives" ON yarn_receives FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access yarn_issues" ON yarn_issues FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access hvi_reports" ON hvi_reports FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access uster_reports" ON uster_reports FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access audit_items" ON audit_items FOR ALL USING (true) WITH CHECK (true);
-  CREATE POLICY "Public full access sample_items" ON sample_items FOR ALL USING (true) WITH CHECK (true);
-EXCEPTION WHEN OTHERS THEN
-  NULL;
-END $$;
+-- Grant permissions to public roles
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
 `;
 
 /**
@@ -401,8 +399,13 @@ export async function syncCottonReceiveToSupabase(item: CottonReceive): Promise<
       actual_receive_kg: item.actualReceiveKg,
       remarks: item.remarks,
     });
-    return !error;
-  } catch {
+    if (error) {
+      console.warn('Supabase Cotton Receive Sync Warning:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.warn('Supabase Cotton Receive Sync Network Exception:', err?.message);
     return false;
   }
 }
@@ -1086,112 +1089,333 @@ export async function populateSupabaseWithInitialSeedData(seedData: {
 }): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     let syncedCount = 0;
-    
-    // Sync Cotton Receives
-    if (seedData.cottonReceives) {
-      for (const item of seedData.cottonReceives) {
-        const ok = await syncCottonReceiveToSupabase(item);
-        if (ok) syncedCount++;
+    const errors: string[] = [];
+
+    // 1. Sync Cotton Receives
+    if (seedData.cottonReceives && seedData.cottonReceives.length > 0) {
+      const rows = seedData.cottonReceives.map((item) => ({
+        id: item.id,
+        date: item.date,
+        origin: item.origin,
+        supplier_name: item.supplierName,
+        consignment: item.consignment,
+        fiber_length: item.fiberLength,
+        lc_no: item.lcNo,
+        id_code: item.idCode,
+        lc_quantity: item.lcQuantity,
+        actual_receive: item.actualReceive,
+        actual_receive_kg: item.actualReceiveKg,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('cotton_receives').upsert(rows);
+      if (error) {
+        errors.push(`Cotton Receives: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Cotton Issues
-    if (seedData.cottonIssues) {
-      for (const item of seedData.cottonIssues) {
-        const ok = await syncCottonIssueToSupabase(item);
-        if (ok) syncedCount++;
+    // 2. Sync Cotton Issues
+    if (seedData.cottonIssues && seedData.cottonIssues.length > 0) {
+      const rows = seedData.cottonIssues.map((item) => ({
+        id: item.id,
+        sr_no: item.srNo,
+        date: item.date,
+        origin: item.origin,
+        consignment: item.consignment,
+        process_type: item.processType,
+        department: item.department,
+        bale_qty: item.baleQty,
+        weight_kg: item.weightKg,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('cotton_issues').upsert(rows);
+      if (error) {
+        errors.push(`Cotton Issues: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Waste Receives
-    if (seedData.wasteReceives) {
-      for (const item of seedData.wasteReceives) {
-        const ok = await syncWasteReceiveToSupabase(item);
-        if (ok) syncedCount++;
+    // 3. Sync Waste Receives
+    if (seedData.wasteReceives && seedData.wasteReceives.length > 0) {
+      const rows = seedData.wasteReceives.map((item) => ({
+        id: item.id,
+        date: item.date,
+        category: item.category,
+        receive_from: item.receiveFrom,
+        quantity: item.quantity,
+        weight_kg: item.weightKg,
+        bales: item.bales,
+        received_by: item.receivedBy,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('waste_receives').upsert(rows);
+      if (error) {
+        errors.push(`Waste Receives: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Waste Issues
-    if (seedData.wasteIssues) {
-      for (const item of seedData.wasteIssues) {
-        const ok = await syncWasteIssueToSupabase(item);
-        if (ok) syncedCount++;
+    // 4. Sync Waste Issues
+    if (seedData.wasteIssues && seedData.wasteIssues.length > 0) {
+      const rows = seedData.wasteIssues.map((item) => ({
+        id: item.id,
+        sr_no: item.srNo,
+        date: item.date,
+        category: item.category,
+        issue_to: item.issueTo,
+        issue_type: item.issueType,
+        quantity: item.quantity,
+        weight_kg: item.weightKg,
+        bales: item.bales,
+        issued_by: item.issuedBy,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('waste_issues').upsert(rows);
+      if (error) {
+        errors.push(`Waste Issues: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Spare Items
-    if (seedData.spareItems) {
-      for (const item of seedData.spareItems) {
-        const ok = await syncSpareItemToSupabase(item);
-        if (ok) syncedCount++;
+    // 5. Sync Spare Items
+    if (seedData.spareItems && seedData.spareItems.length > 0) {
+      const rows = seedData.spareItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        part_number: item.partNumber,
+        section: item.section,
+        source: item.source,
+        opening_stock: item.openingStock,
+        current_stock: item.currentStock,
+        min_stock: item.minStock,
+        unit: item.unit,
+        location: item.location,
+      }));
+      const { error } = await supabase.from('spare_items').upsert(rows);
+      if (error) {
+        errors.push(`Spare Items: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Spare Receives
-    if (seedData.spareReceives) {
-      for (const item of seedData.spareReceives) {
-        const ok = await syncSpareReceiveToSupabase(item);
-        if (ok) syncedCount++;
+    // 6. Sync Spare Receives
+    if (seedData.spareReceives && seedData.spareReceives.length > 0) {
+      const rows = seedData.spareReceives.map((item) => ({
+        id: item.id,
+        item_id: item.itemId,
+        mrr_no: item.mrrNo,
+        date: item.date,
+        quantity: item.quantity,
+        unit: item.unit,
+        received_by: item.receivedBy,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('spare_receives').upsert(rows);
+      if (error) {
+        errors.push(`Spare Receives: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Spare Issues
-    if (seedData.spareIssues) {
-      for (const item of seedData.spareIssues) {
-        const ok = await syncSpareIssueToSupabase(item);
-        if (ok) syncedCount++;
+    // 7. Sync Spare Issues
+    if (seedData.spareIssues && seedData.spareIssues.length > 0) {
+      const rows = seedData.spareIssues.map((item) => ({
+        id: item.id,
+        item_id: item.itemId,
+        sr_no: item.srNo,
+        date: item.date,
+        quantity: item.quantity,
+        unit: item.unit,
+        issue_to: item.issueTo,
+        issued_by: item.issuedBy,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('spare_issues').upsert(rows);
+      if (error) {
+        errors.push(`Spare Issues: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Yarn Receives
-    if (seedData.yarnReceives) {
-      for (const item of seedData.yarnReceives) {
-        const ok = await syncYarnReceiveToSupabase(item);
-        if (ok) syncedCount++;
+    // 8. Sync Yarn Receives
+    if (seedData.yarnReceives && seedData.yarnReceives.length > 0) {
+      const rows = seedData.yarnReceives.map((item) => ({
+        id: item.id,
+        date: item.date,
+        count: item.count,
+        lot_no: item.lotNo,
+        process: item.process,
+        mixing_ratio: item.mixingRatio,
+        quantity: item.quantity,
+        bags: item.bags,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('yarn_receives').upsert(rows);
+      if (error) {
+        errors.push(`Yarn Receives: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Yarn Issues
-    if (seedData.yarnIssues) {
-      for (const item of seedData.yarnIssues) {
-        const ok = await syncYarnIssueToSupabase(item);
-        if (ok) syncedCount++;
+    // 9. Sync Yarn Issues
+    if (seedData.yarnIssues && seedData.yarnIssues.length > 0) {
+      const rows = seedData.yarnIssues.map((item) => ({
+        id: item.id,
+        date: item.date,
+        count: item.count,
+        lot_no: item.lotNo,
+        process: item.process,
+        issue_to: item.issueTo,
+        quantity: item.quantity,
+        bags: item.bags,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('yarn_issues').upsert(rows);
+      if (error) {
+        errors.push(`Yarn Issues: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync HVI Reports
-    if (seedData.hviReports) {
-      for (const item of seedData.hviReports) {
-        const ok = await syncHviReportToSupabase(item);
-        if (ok) syncedCount++;
+    // 10. Sync HVI Reports
+    if (seedData.hviReports && seedData.hviReports.length > 0) {
+      const rows = seedData.hviReports.map((item) => ({
+        id: item.id,
+        test_date: item.testDate,
+        consignment: item.consignment,
+        mic: item.mic,
+        uhml: item.uhml,
+        ui: item.ui,
+        strength: item.strength,
+        elongation: item.elongation,
+        sfi: item.sfi,
+        moisture: item.moisture,
+        rd: item.rd,
+        yellowness: item.yellowness,
+        color_grade: item.colorGrade,
+        trash_cnt: item.trashCnt,
+        trash_ar: item.trashAr,
+        sci: item.sci,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('hvi_reports').upsert(rows);
+      if (error) {
+        errors.push(`HVI Reports: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Uster Reports
-    if (seedData.usterReports) {
-      for (const item of seedData.usterReports) {
-        const ok = await syncUsterReportToSupabase(item);
-        if (ok) syncedCount++;
+    // 11. Sync Uster Reports
+    if (seedData.usterReports && seedData.usterReports.length > 0) {
+      const rows = seedData.usterReports.map((item) => ({
+        id: item.id,
+        test_date: item.testDate,
+        lot_no: item.lotNo,
+        count: item.count,
+        process: item.process,
+        machine: item.machine,
+        unevenness: item.unevenness,
+        cvm: item.cvm,
+        thin_places: item.thinPlaces,
+        thick_places: item.thickPlaces,
+        neps: item.neps,
+        ipi: item.ipi,
+        hairiness: item.hairiness,
+        csp: item.csp,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('uster_reports').upsert(rows);
+      if (error) {
+        errors.push(`Uster Reports: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Audit Items
-    if (seedData.auditItems) {
-      for (const item of seedData.auditItems) {
-        const ok = await syncAuditItemToSupabase(item);
-        if (ok) syncedCount++;
+    // 12. Sync Audit Items
+    if (seedData.auditItems && seedData.auditItems.length > 0) {
+      const rows = seedData.auditItems.map((item) => ({
+        id: item.id,
+        standard: item.standard,
+        certificate_no: item.certificateNo,
+        certifying_body: item.certifyingBody,
+        issue_date: item.issueDate,
+        expiry_date: item.expiryDate,
+        status: item.status,
+        audit_date: item.auditDate,
+        auditor_name: item.auditorName,
+        scope: item.scope,
+        score_grade: item.scoreGrade,
+        document_ref: item.documentRef,
+        remarks: item.remarks,
+      }));
+      const { error } = await supabase.from('audit_items').upsert(rows);
+      if (error) {
+        errors.push(`Audit Items: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    // Sync Sample Items
-    if (seedData.sampleItems) {
-      for (const item of seedData.sampleItems) {
-        const ok = await syncSampleItemToSupabase(item);
-        if (ok) syncedCount++;
+    // 13. Sync Sample Items
+    if (seedData.sampleItems && seedData.sampleItems.length > 0) {
+      const rows = seedData.sampleItems.map((item) => ({
+        id: item.id,
+        sample_code: item.sampleCode,
+        item_name: item.itemName,
+        quantity: item.quantity,
+        installed_on: item.installedOn,
+        test_report: item.testReport,
+        remarks: item.remarks,
+        sample_type: item.sampleType,
+        customer_brand: item.customerBrand,
+        count_lot: item.countLot,
+        machine_frame: item.machineFrame,
+        status: item.status,
+        requested_by: item.requestedBy,
+        hvi_micronaire: item.hviMicronaire,
+        hvi_length_mm: item.hviLengthMm,
+        hvi_strength_gtex: item.hviStrengthGtex,
+        hvi_uniformity_index: item.hviUniformityIndex,
+        hvi_short_fiber_index: item.hviShortFiberIndex,
+        hvi_trash_pct: item.hviTrashPct,
+        hvi_sci: item.hviSCI,
+        uster_csp: item.usterCsp,
+        uster_unevenness_u: item.usterUnevennessU,
+        uster_ipi_total: item.usterIpiTotal,
+        uster_hairiness_h: item.usterHairinessH,
+        uster_thin_50: item.usterThin50,
+        uster_thick_50: item.usterThick50,
+        uster_neps_200: item.usterNeps200,
+        wear_resistance_life: item.wearResistanceLife,
+      }));
+      const { error } = await supabase.from('sample_items').upsert(rows);
+      if (error) {
+        errors.push(`Sample Items: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
       }
     }
 
-    return { success: true, count: syncedCount };
+    if (errors.length > 0 && syncedCount === 0) {
+      return {
+        success: false,
+        count: 0,
+        error: `Supabase write rejected: ${errors[0]}. Please run the updated SQL Schema in Supabase SQL Editor.`,
+      };
+    }
+
+    return { success: true, count: syncedCount, error: errors.length > 0 ? errors.join(', ') : undefined };
   } catch (err: any) {
     return { success: false, count: 0, error: err?.message || 'Failed seeding data' };
   }

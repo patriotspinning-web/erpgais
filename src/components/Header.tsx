@@ -220,8 +220,8 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Header Actions */}
       <div className="flex items-center gap-2.5">
-        {/* Direct Push Seed Data Button */}
-        {onSeedSupabase && (
+        {/* Direct Push Seed Data Button (Super Admin Only) */}
+        {user?.role === 'Super Admin' && onSeedSupabase && (
           <button
             onClick={handlePushSeedClick}
             disabled={isPushingSeed}
@@ -230,26 +230,39 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300'
                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 border-transparent shadow-blue-500/20 active:scale-95'
             }`}
-            title="Push and sync all local mill data to Supabase Cloud Database"
+            title="Push and sync all local mill data to Supabase Cloud Database (Super Admin only)"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isPushingSeed ? 'animate-spin' : ''}`} />
             <span>{isPushingSeed ? 'Pushing Data...' : 'Push Seed Data'}</span>
           </button>
         )}
 
-        {/* Auto Sync Indicator */}
-        <div
-          onClick={() => setSupabaseModalOpen(true)}
-          className="cursor-pointer px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition"
-          title="Auto-Sync is continuously active. Click for DB settings/schema"
-        >
-          <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span className="hidden lg:inline text-[11px]">Auto Sync</span>
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-        </div>
+        {/* Auto Sync Indicator (Super Admin Only Clickable) */}
+        {user?.role === 'Super Admin' ? (
+          <div
+            onClick={() => setSupabaseModalOpen(true)}
+            className="cursor-pointer px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition"
+            title="Auto-Sync active (Super Admin: Click to view/manage DB settings & schema)"
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden lg:inline text-[11px]">Auto Sync</span>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
+        ) : (
+          <div
+            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 select-none cursor-default"
+            title="Real-time Cloud Sync is Active"
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="hidden lg:inline text-[11px]">Sync Active</span>
+            <span className="relative flex h-2 w-2">
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
+        )}
 
         {/* Role Badge */}
         <span
@@ -361,7 +374,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-lg text-slate-900 dark:text-white">Supabase Cloud Connection</h3>
-                  <p className="text-xs text-slate-500 font-mono">https://zmcuzcabmwmoqcnrmdvj.supabase.co</p>
+                  <p className="text-xs text-slate-500 font-mono">{urlInput}</p>
                 </div>
               </div>
               <button

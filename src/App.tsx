@@ -105,13 +105,16 @@ import {
 } from './lib/syncEngine';
 
 export function App() {
-  // Auth & Roles State
-  const [user, setUser] = useState<User | null>({
-    name: 'General Manager',
-    email: 'admin@patriot.com',
-    role: 'Super Admin',
+  // Auth & Roles State (null by default to enforce login screen first)
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const savedUser = sessionStorage.getItem('patriot_erp_auth_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
   });
-  const [userRole, setUserRole] = useState<Role>('Super Admin');
+  const [userRole, setUserRole] = useState<Role>(() => user?.role || 'Store Manager');
 
   // Sidebar Open State
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
@@ -776,6 +779,9 @@ export function App() {
         onLogin={(loggedInUser) => {
           setUser(loggedInUser);
           setUserRole(loggedInUser.role);
+          try {
+            sessionStorage.setItem('patriot_erp_auth_user', JSON.stringify(loggedInUser));
+          } catch (_) {}
           showToast('success', 'Welcome Back', `Logged in as ${loggedInUser.name} (${loggedInUser.role})`);
         }}
       />
@@ -803,9 +809,15 @@ export function App() {
           setUser={(updatedUser) => {
             setUser(updatedUser);
             setUserRole(updatedUser.role);
+            try {
+              sessionStorage.setItem('patriot_erp_auth_user', JSON.stringify(updatedUser));
+            } catch (_) {}
           }}
           logout={() => {
             setUser(null);
+            try {
+              sessionStorage.removeItem('patriot_erp_auth_user');
+            } catch (_) {}
             showToast('info', 'Logged Out', 'You have been safely signed out.');
           }}
           onSeedSupabase={handleSeedSupabase}

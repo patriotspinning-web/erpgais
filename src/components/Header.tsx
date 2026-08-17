@@ -16,8 +16,22 @@ import {
   Key,
   Sliders,
   AlertTriangle,
+  Users,
+  Lock,
+  Menu,
+  Printer,
 } from 'lucide-react';
-import { ModuleType, User } from '../types';
+import {
+  ModuleType,
+  User,
+  CottonReceive,
+  CottonIssue,
+  SpareItem,
+  SpareReceive,
+  SpareIssue,
+  YarnReceive,
+  YarnIssue,
+} from '../types';
 import {
   testSupabaseConnection,
   SUPABASE_SQL_SCHEMA,
@@ -25,6 +39,9 @@ import {
   getSavedSupabaseKey,
   saveSupabaseConfig,
 } from '../lib/supabase';
+import { AuthModule } from './AuthModule';
+import { GlobalSearchBar } from './GlobalSearchBar';
+import { triggerAppPrint } from '../utils/printUtils';
 
 interface HeaderProps {
   currentModule: ModuleType;
@@ -36,6 +53,15 @@ interface HeaderProps {
   onSeedSupabase?: () => Promise<void> | void;
   onExportBackup?: () => void;
   onImportBackup?: (file: File) => void;
+  onToggleSidebar?: () => void;
+  cottonReceives?: CottonReceive[];
+  cottonIssues?: CottonIssue[];
+  spareItems?: SpareItem[];
+  spareReceives?: SpareReceive[];
+  spareIssues?: SpareIssue[];
+  yarnReceives?: YarnReceive[];
+  yarnIssues?: YarnIssue[];
+  onNavigate?: (module: ModuleType) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -48,8 +74,18 @@ export const Header: React.FC<HeaderProps> = ({
   onSeedSupabase,
   onExportBackup,
   onImportBackup,
+  onToggleSidebar,
+  cottonReceives,
+  cottonIssues,
+  spareItems,
+  spareReceives,
+  spareIssues,
+  yarnReceives,
+  yarnIssues,
+  onNavigate,
 }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState<{ connected: boolean; message: string }>({
     connected: true,
@@ -207,25 +243,53 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="no-print sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6">
-      {/* Title & Subtitle */}
-      <div>
-        <h2 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-          {getModuleLabel(currentModule)}
-        </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight hidden sm:block">
-          {getModuleSubtext(currentModule)}
-        </p>
+    <header className="no-print sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-3 sm:px-6">
+      {/* Title & Mobile Toggle */}
+      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition flex-shrink-0 cursor-pointer"
+            aria-label="Open Navigation Menu"
+            title="Open Navigation"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        <div className="min-w-0">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight truncate">
+            {getModuleLabel(currentModule)}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight hidden sm:block truncate">
+            {getModuleSubtext(currentModule)}
+          </p>
+        </div>
       </div>
 
+      {/* Global Search Bar */}
+      {onNavigate && (
+        <div className="flex-1 max-w-lg mx-2 lg:mx-6 flex justify-center">
+          <GlobalSearchBar
+            cottonReceives={cottonReceives}
+            cottonIssues={cottonIssues}
+            spareItems={spareItems}
+            spareReceives={spareReceives}
+            spareIssues={spareIssues}
+            yarnReceives={yarnReceives}
+            yarnIssues={yarnIssues}
+            onNavigate={onNavigate}
+          />
+        </div>
+      )}
+
       {/* Header Actions */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
         {/* Direct Push Seed Data Button (Super Admin Only) */}
         {user?.role === 'Super Admin' && onSeedSupabase && (
           <button
             onClick={handlePushSeedClick}
             disabled={isPushingSeed}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border shadow-sm transition ${
+            className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 sm:gap-2 border shadow-sm transition ${
               isPushingSeed
                 ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300'
                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 border-transparent shadow-blue-500/20 active:scale-95'
@@ -233,7 +297,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Push and sync all local mill data to Supabase Cloud Database (Super Admin only)"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isPushingSeed ? 'animate-spin' : ''}`} />
-            <span>{isPushingSeed ? 'Pushing Data...' : 'Push Seed Data'}</span>
+            <span className="hidden sm:inline">{isPushingSeed ? 'Pushing Data...' : 'Push Seed Data'}</span>
           </button>
         )}
 
@@ -241,7 +305,7 @@ export const Header: React.FC<HeaderProps> = ({
         {user?.role === 'Super Admin' ? (
           <div
             onClick={() => setSupabaseModalOpen(true)}
-            className="cursor-pointer px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition"
+            className="cursor-pointer px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 sm:gap-2 border bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition"
             title="Auto-Sync active (Super Admin: Click to view/manage DB settings & schema)"
           >
             <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -253,7 +317,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         ) : (
           <div
-            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 border bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 select-none cursor-default"
+            className="px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 sm:gap-2 border bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 select-none cursor-default"
             title="Real-time Cloud Sync is Active"
           >
             <Database className="w-3.5 h-3.5 text-emerald-500" />
@@ -266,7 +330,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Role Badge */}
         <span
-          className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
+          className={`hidden sm:flex px-2.5 py-1 rounded-full text-xs font-semibold items-center gap-1 ${
             user?.role === 'Super Admin'
               ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
               : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
@@ -276,10 +340,21 @@ export const Header: React.FC<HeaderProps> = ({
           {user?.role || 'User'}
         </span>
 
+        {/* Print Report Trigger */}
+        <button
+          onClick={() => triggerAppPrint()}
+          className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700/80 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 flex items-center gap-1.5 text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer"
+          title="Print Active Module / Report (Ctrl+P / ⌘P)"
+          aria-label="Print Report"
+        >
+          <Printer className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+          <span className="hidden sm:inline">Print</span>
+        </button>
+
         {/* Dark/Light Mode Toggle */}
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition cursor-pointer"
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
@@ -289,12 +364,12 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="relative">
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+            className="flex items-center gap-1.5 p-1 sm:p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
           >
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-semibold text-xs shadow">
               {user?.name ? user.name.charAt(0) : 'U'}
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden xs:block" />
           </button>
 
           {userMenuOpen && (
@@ -309,41 +384,37 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80">
                 <p className="text-sm font-bold text-slate-900 dark:text-white">{user?.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
+                <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
+                  <ShieldCheck className="w-3 h-3" />
+                  {user?.role}
+                </div>
               </div>
 
-              {/* Demo Switch Role Options */}
-              <div className="p-2 border-b border-slate-200 dark:border-slate-700">
-                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Switch Active Role (Demo)
-                </p>
+              {/* Account Actions */}
+              <div className="p-2 border-b border-slate-200 dark:border-slate-700 space-y-1">
                 <button
                   onClick={() => {
-                    setUser({ name: 'Store Manager', email: 'store@patriot.com', role: 'Store Manager' });
                     setUserMenuOpen(false);
+                    setAuthModalOpen(true);
                   }}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center justify-between transition ${
-                    user?.role === 'Store Manager'
-                      ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-600 dark:text-blue-400'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-                  }`}
+                  className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2 transition"
                 >
-                  <span>Store Manager</span>
-                  {user?.role === 'Store Manager' && <span className="text-[10px]">Active</span>}
+                  <Lock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>Change Password</span>
                 </button>
-                <button
-                  onClick={() => {
-                    setUser({ name: 'Admin User', email: 'admin@patriot.com', role: 'Super Admin' });
-                    setUserMenuOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center justify-between transition ${
-                    user?.role === 'Super Admin'
-                      ? 'bg-purple-50 dark:bg-purple-900/30 font-semibold text-purple-600 dark:text-purple-400'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  <span>Super Admin</span>
-                  {user?.role === 'Super Admin' && <span className="text-[10px]">Active</span>}
-                </button>
+
+                {user?.role === 'Super Admin' && (
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      setAuthModalOpen(true);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/30 flex items-center gap-2 transition"
+                  >
+                    <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span>Manage User Accounts</span>
+                  </button>
+                )}
               </div>
 
               <div className="p-2">
@@ -600,6 +671,14 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       )}
+
+      {/* User Authentication & Password Management Modal */}
+      <AuthModule
+        currentUser={user}
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onUserUpdated={(updatedUser) => setUser(updatedUser)}
+      />
     </header>
   );
 };

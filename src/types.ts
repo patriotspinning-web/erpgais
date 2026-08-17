@@ -206,21 +206,36 @@ export interface HVIReport {
   remarks: string;
 }
 
+export type UsterStage =
+  | 'card_sliver'
+  | 'b_drawing'
+  | 'f_drawing'
+  | 'simplex_roving'
+  | 'ring_yarn'
+  | 'finished_yarn';
+
 export interface UsterReport {
   id: number;
+  stage?: UsterStage; // Stage: Card Sliver, B Drawing, F Drawing, Simplex Roving, Ring Yarn, Finished Yarn
+  uTestId?: string; // U Test ID (e.g. UT-CRD-001, UT-RNG-001)
   testDate: string;
-  lotNo: string;
-  count: string;
-  process: 'Ring' | 'Rotor';
-  machine: string;
+  lotNo: string; // Lot
+  mixing?: string; // Mixing / Blend composition
+  machine: string; // Machine No
+  count?: string; // A. Count (for Ring Yarn & Finished Yarn)
+  csp?: number; // Count Strength Product (for Ring Yarn & Finished Yarn)
   unevenness: number; // U%
   cvm: number; // CVm%
-  thinPlaces: number; // Thin (-50%/km)
-  thickPlaces: number; // Thick (+50%/km)
-  neps: number; // Neps (+200%/km)
-  ipi: number; // Total Imperfection Index
-  hairiness: number; // H
-  csp: number; // Count Strength Product
+  cvm1m?: number; // CVm 1m (for Card Sliver to Simplex Roving)
+  cvm3m?: number; // CVm 3m (for Card Sliver to Simplex Roving)
+  thinPlaces?: number; // Thin (-50%/km)
+  thickPlaces?: number; // Thick (+50%/km)
+  neps?: number; // Neps (+200%/km)
+  ipi?: number; // Total Imperfection Index (Auto calculated = Thin + Thick + Neps)
+  hairiness?: number; // Hairiness H
+  process?: 'Ring' | 'Rotor';
+  shift?: 'A' | 'B' | 'C' | 'General';
+  testedBy?: string;
   remarks: string;
 }
 

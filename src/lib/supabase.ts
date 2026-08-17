@@ -219,19 +219,26 @@ CREATE TABLE IF NOT EXISTS hvi_reports (
 -- 11. Quality Uster Reports Table
 CREATE TABLE IF NOT EXISTS uster_reports (
   id BIGINT PRIMARY KEY,
+  stage TEXT DEFAULT 'ring_yarn',
+  u_test_id TEXT,
   test_date TEXT NOT NULL,
   lot_no TEXT NOT NULL,
-  count TEXT NOT NULL,
-  process TEXT NOT NULL,
+  mixing TEXT,
+  count TEXT,
+  process TEXT DEFAULT 'Ring',
   machine TEXT NOT NULL,
   unevenness NUMERIC DEFAULT 0,
   cvm NUMERIC DEFAULT 0,
+  cvm_1m NUMERIC DEFAULT 0,
+  cvm_3m NUMERIC DEFAULT 0,
   thin_places NUMERIC DEFAULT 0,
   thick_places NUMERIC DEFAULT 0,
   neps NUMERIC DEFAULT 0,
   ipi NUMERIC DEFAULT 0,
   hairiness NUMERIC DEFAULT 0,
   csp NUMERIC DEFAULT 0,
+  shift TEXT,
+  tested_by TEXT,
   remarks TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -287,6 +294,16 @@ CREATE TABLE IF NOT EXISTS sample_items (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 14. System Users & Credentials Table
+CREATE TABLE IF NOT EXISTS system_users (
+  email TEXT PRIMARY KEY,
+  password TEXT NOT NULL,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'Store Manager',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Disable Row Level Security (RLS) & Grant full access for seamless ERP sync
 ALTER TABLE cotton_receives DISABLE ROW LEVEL SECURITY;
 ALTER TABLE cotton_issues DISABLE ROW LEVEL SECURITY;
@@ -301,11 +318,28 @@ ALTER TABLE hvi_reports DISABLE ROW LEVEL SECURITY;
 ALTER TABLE uster_reports DISABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE sample_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE system_users DISABLE ROW LEVEL SECURITY;
 
 -- Grant permissions to public roles
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+
+-- Enable Realtime for tables
+ALTER PUBLICATION supabase_realtime ADD TABLE cotton_receives;
+ALTER PUBLICATION supabase_realtime ADD TABLE cotton_issues;
+ALTER PUBLICATION supabase_realtime ADD TABLE waste_receives;
+ALTER PUBLICATION supabase_realtime ADD TABLE waste_issues;
+ALTER PUBLICATION supabase_realtime ADD TABLE spare_items;
+ALTER PUBLICATION supabase_realtime ADD TABLE spare_receives;
+ALTER PUBLICATION supabase_realtime ADD TABLE spare_issues;
+ALTER PUBLICATION supabase_realtime ADD TABLE yarn_receives;
+ALTER PUBLICATION supabase_realtime ADD TABLE yarn_issues;
+ALTER PUBLICATION supabase_realtime ADD TABLE hvi_reports;
+ALTER PUBLICATION supabase_realtime ADD TABLE uster_reports;
+ALTER PUBLICATION supabase_realtime ADD TABLE audit_items;
+ALTER PUBLICATION supabase_realtime ADD TABLE sample_items;
+ALTER PUBLICATION supabase_realtime ADD TABLE system_users;
 `;
 
 /**
@@ -889,19 +923,26 @@ export async function fetchUsterReportsFromSupabase(): Promise<UsterReport[] | n
     if (error || !data) return null;
     return data.map((row) => ({
       id: Number(row.id),
+      stage: row.stage || 'ring_yarn',
+      uTestId: row.u_test_id || `UT-${row.id}`,
       testDate: row.test_date,
       lotNo: row.lot_no,
-      count: row.count,
+      mixing: row.mixing || '',
+      count: row.count || '',
       process: row.process as 'Ring' | 'Rotor',
       machine: row.machine,
       unevenness: Number(row.unevenness || 0),
       cvm: Number(row.cvm || 0),
-      thinPlaces: Number(row.thin_places || 0),
-      thickPlaces: Number(row.thick_places || 0),
-      neps: Number(row.neps || 0),
-      ipi: Number(row.ipi || 0),
-      hairiness: Number(row.hairiness || 0),
-      csp: Number(row.csp || 0),
+      cvm1m: row.cvm_1m !== undefined && row.cvm_1m !== null ? Number(row.cvm_1m) : undefined,
+      cvm3m: row.cvm_3m !== undefined && row.cvm_3m !== null ? Number(row.cvm_3m) : undefined,
+      thinPlaces: row.thin_places !== undefined && row.thin_places !== null ? Number(row.thin_places) : undefined,
+      thickPlaces: row.thick_places !== undefined && row.thick_places !== null ? Number(row.thick_places) : undefined,
+      neps: row.neps !== undefined && row.neps !== null ? Number(row.neps) : undefined,
+      ipi: row.ipi !== undefined && row.ipi !== null ? Number(row.ipi) : undefined,
+      hairiness: row.hairiness !== undefined && row.hairiness !== null ? Number(row.hairiness) : undefined,
+      csp: row.csp !== undefined && row.csp !== null ? Number(row.csp) : undefined,
+      shift: row.shift || 'A',
+      testedBy: row.tested_by || '',
       remarks: row.remarks || '',
     }));
   } catch {
@@ -913,19 +954,26 @@ export async function syncUsterReportToSupabase(item: UsterReport): Promise<bool
   try {
     const { error } = await supabase.from('uster_reports').upsert({
       id: item.id,
+      stage: item.stage || 'ring_yarn',
+      u_test_id: item.uTestId || `UT-${item.id}`,
       test_date: item.testDate,
       lot_no: item.lotNo,
-      count: item.count,
-      process: item.process,
+      mixing: item.mixing || '',
+      count: item.count || '',
+      process: item.process || 'Ring',
       machine: item.machine,
       unevenness: item.unevenness,
       cvm: item.cvm,
-      thin_places: item.thinPlaces,
-      thick_places: item.thickPlaces,
-      neps: item.neps,
-      ipi: item.ipi,
-      hairiness: item.hairiness,
-      csp: item.csp,
+      cvm_1m: item.cvm1m ?? 0,
+      cvm_3m: item.cvm3m ?? 0,
+      thin_places: item.thinPlaces ?? 0,
+      thick_places: item.thickPlaces ?? 0,
+      neps: item.neps ?? 0,
+      ipi: item.ipi ?? 0,
+      hairiness: item.hairiness ?? 0,
+      csp: item.csp ?? 0,
+      shift: item.shift || 'A',
+      tested_by: item.testedBy || '',
       remarks: item.remarks,
     });
     return !error;
@@ -1420,3 +1468,118 @@ export async function populateSupabaseWithInitialSeedData(seedData: {
     return { success: false, count: 0, error: err?.message || 'Failed seeding data' };
   }
 }
+
+/**
+ * ------------------------------------------------------------------
+ * USER MANAGEMENT & PASSWORD CREDENTIALS IN SUPABASE
+ * ------------------------------------------------------------------
+ */
+
+export interface SystemUserRecord {
+  email: string;
+  password: string;
+  name: string;
+  role: 'Store Manager' | 'Super Admin' | 'Quality Officer';
+  updated_at?: string;
+  created_at?: string;
+}
+
+/**
+ * Fetch all system users from Supabase Cloud table
+ */
+export async function fetchSystemUsersFromSupabase(): Promise<SystemUserRecord[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from('system_users')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    if (!data) return null;
+    return data.map((d: any) => ({
+      email: d.email,
+      password: d.password,
+      name: d.name,
+      role: d.role,
+      updated_at: d.updated_at,
+      created_at: d.created_at,
+    }));
+  } catch (err) {
+    console.warn('Could not fetch system users from Supabase:', err);
+    return null;
+  }
+}
+
+/**
+ * Upsert / Save a system user to Supabase
+ */
+export async function saveSystemUserToSupabase(user: SystemUserRecord): Promise<{ success: boolean; error?: string }> {
+  try {
+    const row = {
+      email: user.email.trim().toLowerCase(),
+      password: user.password.trim(),
+      name: user.name.trim(),
+      role: user.role,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('system_users').upsert(row);
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to save user to Supabase' };
+  }
+}
+
+/**
+ * Delete a user from Supabase
+ */
+export async function deleteSystemUserFromSupabase(email: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('system_users').delete().eq('email', email.trim().toLowerCase());
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Update user password in Supabase:
+ * 1. Updates password in Supabase Auth if session exists or during reset
+ * 2. Updates password in system_users cloud table
+ */
+export async function updateUserPasswordInSupabase(
+  email: string,
+  newPassword: string
+): Promise<{ success: boolean; message: string }> {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanPass = newPassword.trim();
+
+  if (cleanPass.length < 6) {
+    return { success: false, message: 'Password must be at least 6 characters long.' };
+  }
+
+  try {
+    // 1. Update in system_users table
+    const { error: dbError } = await supabase
+      .from('system_users')
+      .update({ password: cleanPass, updated_at: new Date().toISOString() })
+      .eq('email', cleanEmail);
+
+    if (dbError) {
+      console.warn('Database user password update warning:', dbError.message);
+    }
+
+    // 2. Also attempt Supabase Auth updateUser if active session
+    try {
+      await supabase.auth.updateUser({ password: cleanPass });
+    } catch (_) {
+      // ignore if not logged in with supabase auth session
+    }
+
+    return { success: true, message: 'Password updated successfully across system and cloud!' };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Failed to update password.' };
+  }
+}
+

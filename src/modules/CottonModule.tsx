@@ -10,9 +10,11 @@ import {
   Calendar,
   Layers,
   Search,
+  Printer,
 } from 'lucide-react';
 import { CottonReceive, CottonIssue, CottonLotStock } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
+import { triggerAppPrint } from '../utils/printUtils';
 
 interface CottonModuleProps {
   subTab: 'receive' | 'issue' | 'stock' | 'reports';
@@ -502,6 +504,13 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Recent Cotton Receive Log ({cottonReceives.length})
               </h3>
+              <button
+                onClick={() => triggerAppPrint()}
+                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                title="Print Cotton Receive Log"
+              >
+                <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Log
+              </button>
             </div>
             <div className="overflow-x-auto max-h-[400px]">
               <table className="w-full text-xs text-left">
@@ -724,6 +733,13 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Cotton Issue History ({cottonIssues.length})
               </h3>
+              <button
+                onClick={() => triggerAppPrint()}
+                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                title="Print Cotton Issue History"
+              >
+                <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Log
+              </button>
             </div>
             <div className="overflow-x-auto max-h-[400px]">
               <table className="w-full text-xs text-left">
@@ -803,6 +819,13 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => triggerAppPrint()}
+                className="no-print px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition"
+                title="Print Cotton Stock Report"
+              >
+                <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Stock
+              </button>
               <button
                 onClick={exportStockExcel}
                 className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition"
@@ -936,23 +959,32 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
                   />
                 </div>
 
-                <button
-                  onClick={() => {
-                    const dailyRec = cottonReceives.filter((r) => r.date === dailyDate);
-                    const dailyIss = cottonIssues.filter((i) => i.date === dailyDate);
-                    exportToExcel(
-                      [
-                        ...dailyRec.map((r) => ({ Type: 'RECEIVE', ...r })),
-                        ...dailyIss.map((i) => ({ Type: 'ISSUE', ...i })),
-                      ],
-                      `Cotton_Daily_${dailyDate}`
-                    );
-                    showToast('success', 'Excel Exported', `Downloaded Daily Report for ${dailyDate}`);
-                  }}
-                  className="px-3 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1"
-                >
-                  <Download className="w-3.5 h-3.5" /> Export Excel
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => triggerAppPrint()}
+                    className="no-print px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1 transition"
+                    title="Print Daily Cotton Report"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Report
+                  </button>
+                  <button
+                    onClick={() => {
+                      const dailyRec = cottonReceives.filter((r) => r.date === dailyDate);
+                      const dailyIss = cottonIssues.filter((i) => i.date === dailyDate);
+                      exportToExcel(
+                        [
+                          ...dailyRec.map((r) => ({ Type: 'RECEIVE', ...r })),
+                          ...dailyIss.map((i) => ({ Type: 'ISSUE', ...i })),
+                        ],
+                        `Cotton_Daily_${dailyDate}`
+                      );
+                      showToast('success', 'Excel Exported', `Downloaded Daily Report for ${dailyDate}`);
+                    }}
+                    className="px-3 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export Excel
+                  </button>
+                </div>
               </div>
 
               {/* Summary Cards */}
@@ -991,6 +1023,13 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
                     className="px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 font-bold"
                   />
                 </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1 transition"
+                  title="Print Monthly Cotton Report"
+                >
+                  <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Report
+                </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1029,6 +1068,13 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
               </div>
 
               <div className="flex gap-2">
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs shadow transition flex items-center gap-1.5"
+                  title="Print Report"
+                >
+                  <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print
+                </button>
                 <button
                   onClick={() => {
                     if (reportType === 'receive') exportToExcel(cottonReceives, 'Cotton_Receive_Full');

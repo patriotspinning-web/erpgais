@@ -11,6 +11,7 @@ import {
   Layers,
   ShieldCheck,
   TestTube,
+  Printer,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,6 +35,7 @@ import {
   YarnIssue,
   ModuleType,
 } from '../types';
+import { triggerAppPrint } from '../utils/printUtils';
 
 interface DashboardModuleProps {
   cottonReceives: CottonReceive[];
@@ -136,6 +138,13 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => triggerAppPrint()}
+            className="no-print px-3.5 py-2 bg-white/20 hover:bg-white/30 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow transition backdrop-blur-sm"
+            title="Print Dashboard Overview"
+          >
+            <Printer className="w-4 h-4 text-blue-200" /> Print Summary
+          </button>
           <button
             onClick={() => navigate('cotton-receive')}
             className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow transition"

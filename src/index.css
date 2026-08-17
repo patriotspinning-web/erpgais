@@ -1,1 +1,173 @@
 @import "tailwindcss";
+
+/* =========================================================
+   PROFESSIONAL REPORT PRINT STYLES
+   Optimized for A4 Portrait Mode (210mm x 297mm)
+   ========================================================= */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 12mm 10mm;
+  }
+
+  /* Reset layout and backgrounds for printing */
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Reset all layout containers & wrappers */
+  #root,
+  #root > div,
+  div[class*="min-h-screen"],
+  div[class*="h-screen"],
+  .flex-1,
+  main {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  /* Neutralize sidebar offsets */
+  .md\:ml-64,
+  .md\:ml-20,
+  [class*="ml-"] {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  /* Hide navigation, sidebar, interactive controls, toolbars and modals */
+  .no-print,
+  nav,
+  aside,
+  header,
+  button,
+  input,
+  select,
+  textarea,
+  .no-print-area,
+  [role="dialog"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Allow print-only sections to display */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .print-report-header {
+    display: block !important;
+    visibility: visible !important;
+    border-bottom: 2px solid #0f172a !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Tables: Full width with solid legible borders */
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 8px !important;
+    margin-bottom: 16px !important;
+    page-break-inside: auto !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+    background-color: #f1f5f9 !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #94a3b8 !important;
+    padding: 6px 8px !important;
+    font-size: 8.5pt !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    text-align: left !important;
+  }
+
+  td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 5px 8px !important;
+    font-size: 8.5pt !important;
+    color: #1e293b !important;
+    background-color: #ffffff !important;
+  }
+
+  /* Cards & Grid Containers */
+  .print-card,
+  [class*="rounded-2xl"],
+  [class*="rounded-xl"] {
+    page-break-inside: avoid !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    margin-bottom: 12px !important;
+    background: #ffffff !important;
+  }
+
+  /* Grid layouts */
+  .grid {
+    display: grid !important;
+    gap: 12px !important;
+  }
+
+  /* Links styling */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+}
+
+/* Screen only indicator */
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+

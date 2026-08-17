@@ -20,10 +20,12 @@ import {
   ExternalLink,
   Sparkles,
   RefreshCw,
+  Printer,
 } from 'lucide-react';
 import { uploadFileToSupabaseStorage } from '../lib/supabase';
 import { AuditItem, AuditStandard, AuditStatus } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
+import { triggerAppPrint } from '../utils/printUtils';
 
 interface AuditModuleProps {
   auditItems: AuditItem[];
@@ -244,6 +246,13 @@ export const AuditModule: React.FC<AuditModuleProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => triggerAppPrint()}
+              className="no-print px-3.5 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+              title="Print Audit & Compliance Register"
+            >
+              <Printer className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Print
+            </button>
             <button
               onClick={() => handleOpenModal()}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md transition"

@@ -13,6 +13,7 @@ import {
   UsterReport,
   AuditItem,
   SampleItem,
+  AccountTransaction,
 } from '../types';
 
 export function getSavedSupabaseUrl(): string {
@@ -304,6 +305,27 @@ CREATE TABLE IF NOT EXISTS system_users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 15. Accounts Transactions & Ledger Table
+CREATE TABLE IF NOT EXISTS account_transactions (
+  id BIGINT PRIMARY KEY,
+  voucher_no TEXT NOT NULL,
+  date TEXT NOT NULL,
+  voucher_type TEXT NOT NULL,
+  account_head TEXT NOT NULL,
+  category TEXT NOT NULL,
+  party_name TEXT NOT NULL,
+  debit NUMERIC DEFAULT 0,
+  credit NUMERIC DEFAULT 0,
+  amount NUMERIC DEFAULT 0,
+  payment_method TEXT NOT NULL,
+  reference_no TEXT,
+  bank_account TEXT,
+  narration TEXT,
+  approved_by TEXT,
+  status TEXT DEFAULT 'Approved',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Disable Row Level Security (RLS) & Grant full access for seamless ERP sync
 ALTER TABLE cotton_receives DISABLE ROW LEVEL SECURITY;
 ALTER TABLE cotton_issues DISABLE ROW LEVEL SECURITY;
@@ -319,6 +341,7 @@ ALTER TABLE uster_reports DISABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE sample_items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE system_users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE account_transactions DISABLE ROW LEVEL SECURITY;
 
 -- Grant permissions to public roles
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
@@ -340,6 +363,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE uster_reports;
 ALTER PUBLICATION supabase_realtime ADD TABLE audit_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE sample_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE system_users;
+ALTER PUBLICATION supabase_realtime ADD TABLE account_transactions;
 `;
 
 /**
@@ -1117,6 +1141,69 @@ export async function syncSampleItemToSupabase(item: SampleItem): Promise<boolea
   }
 }
 
+// Account Transactions
+export async function fetchAccountTransactionsFromSupabase(): Promise<AccountTransaction[] | null> {
+  try {
+    const { data, error } = await supabase.from('account_transactions').select('*').order('id', { ascending: false });
+    if (error || !data) return null;
+    return data.map((row) => ({
+      id: Number(row.id),
+      voucherNo: row.voucher_no,
+      date: row.date,
+      voucherType: row.voucher_type,
+      accountHead: row.account_head,
+      category: row.category,
+      partyName: row.party_name,
+      debit: Number(row.debit || 0),
+      credit: Number(row.credit || 0),
+      amount: Number(row.amount || 0),
+      paymentMethod: row.payment_method,
+      referenceNo: row.reference_no,
+      bankAccount: row.bank_account,
+      narration: row.narration || '',
+      approvedBy: row.approved_by,
+      status: row.status,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function syncAccountTransactionToSupabase(item: AccountTransaction): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('account_transactions').upsert({
+      id: item.id,
+      voucher_no: item.voucherNo,
+      date: item.date,
+      voucher_type: item.voucherType,
+      account_head: item.accountHead,
+      category: item.category,
+      party_name: item.partyName,
+      debit: item.debit,
+      credit: item.credit,
+      amount: item.amount,
+      payment_method: item.paymentMethod,
+      reference_no: item.referenceNo,
+      bank_account: item.bankAccount,
+      narration: item.narration,
+      approved_by: item.approvedBy,
+      status: item.status,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteAccountTransactionFromSupabase(id: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('account_transactions').delete().eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Seed initial mill data into Supabase if tables are currently empty
  */
@@ -1134,6 +1221,7 @@ export async function populateSupabaseWithInitialSeedData(seedData: {
   usterReports?: UsterReport[];
   auditItems?: AuditItem[];
   sampleItems?: SampleItem[];
+  accountTransactions?: AccountTransaction[];
 }): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     let syncedCount = 0;
@@ -1450,6 +1538,34 @@ export async function populateSupabaseWithInitialSeedData(seedData: {
       const { error } = await supabase.from('sample_items').upsert(rows);
       if (error) {
         errors.push(`Sample Items: ${error.message}`);
+      } else {
+        syncedCount += rows.length;
+      }
+    }
+
+    // 14. Sync Account Transactions
+    if (seedData.accountTransactions && seedData.accountTransactions.length > 0) {
+      const rows = seedData.accountTransactions.map((item) => ({
+        id: item.id,
+        voucher_no: item.voucherNo,
+        date: item.date,
+        voucher_type: item.voucherType,
+        account_head: item.accountHead,
+        category: item.category,
+        party_name: item.partyName,
+        debit: item.debit,
+        credit: item.credit,
+        amount: item.amount,
+        payment_method: item.paymentMethod,
+        reference_no: item.referenceNo,
+        bank_account: item.bankAccount,
+        narration: item.narration,
+        approved_by: item.approvedBy,
+        status: item.status,
+      }));
+      const { error } = await supabase.from('account_transactions').upsert(rows);
+      if (error) {
+        errors.push(`Account Transactions: ${error.message}`);
       } else {
         syncedCount += rows.length;
       }

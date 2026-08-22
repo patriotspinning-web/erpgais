@@ -53,6 +53,8 @@ interface HeaderProps {
   onSeedSupabase?: () => Promise<void> | void;
   onExportBackup?: () => void;
   onImportBackup?: (file: File) => void;
+  onRestoreSeedData?: () => void;
+  onClearAllData?: () => void;
   onToggleSidebar?: () => void;
   cottonReceives?: CottonReceive[];
   cottonIssues?: CottonIssue[];
@@ -74,6 +76,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSeedSupabase,
   onExportBackup,
   onImportBackup,
+  onRestoreSeedData,
+  onClearAllData,
   onToggleSidebar,
   cottonReceives,
   cottonIssues,
@@ -209,8 +213,24 @@ export const Header: React.FC<HeaderProps> = ({
       'yarn-stock': 'Yarn Live Stock',
       'hvi-reports': 'HVI Quality Test Reports',
       'uster-reports': 'Uster Evenness Test Reports',
-      'audit-compliance': 'Audit & Certification Compliance (GOTS/OCS/ISO/BCI)',
+      'audit-compliance': 'Audit & Certification Compliance (GRS/GOTS/OCS/BCI/ISO)',
+      'audit-dashboard': 'Audit & Compliance Dashboard Overview',
+      'audit-receives': 'Certified Cotton & TC Inward Management',
+      'audit-traceability': 'TC-wise Stock Control & Full Traceability',
+      'audit-usages': 'Certified Cotton Consumption & Yarn Production',
+      'audit-schedule': 'Audit Management & CAPA Resolution Tracker',
+      'audit-certificates': 'Scope Certificates & Document Repository',
+      'audit-reports': 'Audit & Compliance Official Reporting Hub',
       'sample-management': 'Sample Room & Quality Trials',
+      'accounts-dashboard': 'Factory Cash Dashboard (ক্যাশ ড্যাশবোর্ড)',
+      'accounts-receive': 'Money Receive / টাকা জমা Entry',
+      'accounts-expense': 'Factory Daily Expense (দৈনিক খরচ)',
+      'accounts-daily-summary': 'Daily Cash Summary Sheet (দৈনিক ক্যাশ সামারি)',
+      'accounts-monthly-summary': 'Monthly Accounts Summary (মাসিক হিসাব সামারি)',
+      'accounts-reports': 'Factory Accounts & Cash Reports (রিপোর্টসমূহ)',
+      'accounts-vouchers': 'Factory Cash Dashboard (ক্যাশ ড্যাশবোর্ড)',
+      'accounts-income': 'Money Receive / টাকা জমা Entry',
+      'accounts-ledger': 'Daily Cash Summary Sheet (দৈনিক ক্যাশ সামারি)',
     };
     return labels[mod] || 'Patriot ERP';
   };
@@ -236,8 +256,24 @@ export const Header: React.FC<HeaderProps> = ({
       'yarn-stock': 'Count-wise finished yarn inventory balance',
       'hvi-reports': 'High Volume Instrument fiber quality parameters (Micronaire, Length, Strength, SCI)',
       'uster-reports': 'Uster yarn evenness, imperfecions (IPI), hairiness, and CSP tests',
-      'audit-compliance': 'Global certification audit tracking for GOTS, OCS, ISO 9001/14001, BCI, and OEKO-TEX',
+      'audit-compliance': 'Global certification audit tracking for GRS, GOTS, OCS, ISO 9001/14001, BCI, and OEKO-TEX',
+      'audit-dashboard': 'Standard-wise live stock summary, expiring certificates alerts, and quick actions',
+      'audit-receives': 'TC-wise certified cotton receipts, origin, lot, bales, and certification documents',
+      'audit-traceability': 'End-to-end chain-of-custody mass balance ledger and TC stock reconciliation',
+      'audit-usages': 'Buyer and party-wise certified cotton consumption, yarn conversion, and wastage %',
+      'audit-schedule': 'Surveillance audit schedule, certifying bodies, non-conformities, and CAPA resolution',
+      'audit-certificates': 'Scope certificates validity periods, license numbers, and renewal alerts',
+      'audit-reports': '10 Official audit statements for third-party certifying bodies, brand buyers, and ESG compliance',
       'sample-management': 'Sample item tracking with quantity, installation date, machine frames, test reports, and remarks',
+      'accounts-dashboard': 'আজকের শুরু ক্যাশ, মোট জমা, মোট খরচ, সমাপনী ক্যাশ এবং চলতি ব্যালেন্স ট্র্যাকিং',
+      'accounts-receive': 'হেড অফিস ফান্ড, ওয়েস্টেজ, সবজি, মাছ, স্ক্র্যাপ বিক্রয় ও অন্যান্য আয় এন্ট্রি',
+      'accounts-expense': 'বেতন, মেইনটেন্যান্স, লোকাল ক্রয়, পরিবহন, লেবার ও অফিসসহ সকল ক্যাশ খরচ এন্ট্রি',
+      'accounts-daily-summary': 'দিনের শুরুর ব্যালেন্স + আজকের জমা - আজকের খরচ = সমাপনী ব্যালেন্স ও দৈনিক শিট',
+      'accounts-monthly-summary': 'মাসের মোট ডেবিট-ক্রেডিট হিসাব, দিনভিত্তিক ক্যাশ বিবরণী এবং ক্লোজিং ব্যালেন্স',
+      'accounts-reports': 'দৈনিক ক্যাশ, তারিখভিত্তিক জমা/খরচ, খাতভিত্তিক আয়/ব্যয় এবং মাসিক সামারি রিপোর্ট',
+      'accounts-vouchers': 'আজকের শুরু ক্যাশ, মোট জমা, মোট খরচ, সমাপনী ক্যাশ এবং চলতি ব্যালেন্স ট্র্যাকিং',
+      'accounts-income': 'হেড অফিস ফান্ড, ওয়েস্টেজ, সবজি, মাছ, স্ক্র্যাপ বিক্রয় ও অন্যান্য আয় এন্ট্রি',
+      'accounts-ledger': 'দিনের শুরুর ব্যালেন্স + আজকের জমা - আজকের খরচ = সমাপনী ব্যালেন্স ও দৈনিক শিট',
     };
     return subtexts[mod] || '';
   };
@@ -623,6 +659,42 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Restore Full Mill Dataset Action */}
+            {onRestoreSeedData && (
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Load All Default Mill Records</p>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300">Populate all modules with standard Patriot Spinning Mills records</p>
+                </div>
+                <button
+                  onClick={onRestoreSeedData}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
+                >
+                  Load All Data
+                </button>
+              </div>
+            )}
+
+            {/* Clear All Data Option */}
+            {onClearAllData && (
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/60 rounded-2xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-rose-900 dark:text-rose-200">Wipe & Clear All Data</p>
+                  <p className="text-[11px] text-rose-700 dark:text-rose-300">Empty all modules (Cotton, Wastage, Spares, Yarn, Quality & Samples)</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to clear all data from all modules? This will reset all tables to empty.')) {
+                      onClearAllData();
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
+                >
+                  Clear All Data
+                </button>
+              </div>
+            )}
 
             {/* SQL Schema Copy Box */}
             <div className="space-y-2">

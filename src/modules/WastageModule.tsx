@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   PackagePlus,
   PackageMinus,
@@ -10,10 +10,13 @@ import {
   Calendar,
   Layers,
   Printer,
+  Search,
 } from 'lucide-react';
 import { WasteReceive, WasteIssue, WasteCategoryStock } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { triggerAppPrint } from '../utils/printUtils';
+import { DateRangeFilter } from '../components/DateRangeFilter';
+import { isDateInRange } from '../utils/dateUtils';
 
 interface WastageModuleProps {
   subTab: 'receive' | 'issue' | 'stock' | 'reports';
@@ -68,14 +71,52 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
     remarks: '',
   });
 
+  // Filter States
+  const [receiveStartDate, setReceiveStartDate] = useState('');
+  const [receiveEndDate, setReceiveEndDate] = useState('');
+  const [receiveSearch, setReceiveSearch] = useState('');
+
+  const [issueStartDate, setIssueStartDate] = useState('');
+  const [issueEndDate, setIssueEndDate] = useState('');
+  const [issueSearch, setIssueSearch] = useState('');
+
   // Reports
-  const [reportType, setReportType] = useState<'daily' | 'monthly' | 'category' | 'ledger'>('daily');
+  const [reportType, setReportType] = useState<'daily' | 'monthly' | 'range' | 'category' | 'ledger'>('daily');
   const [dailyDate, setDailyDate] = useState(new Date().toISOString().split('T')[0]);
   const [monthlyPeriod, setMonthlyPeriod] = useState(new Date().toISOString().substring(0, 7));
+  const [rangeStartDate, setRangeStartDate] = useState('');
+  const [rangeEndDate, setRangeEndDate] = useState('');
 
   const generateSrNo = () => {
     return `SR-W-${new Date().getFullYear()}-${String(wasteIssues.length + 1).padStart(3, '0')}`;
   };
+
+  // Filtered Waste Receives
+  const filteredWasteReceives = useMemo(() => {
+    return wasteReceives.filter((r) => {
+      const matchesDate = isDateInRange(r.date, receiveStartDate, receiveEndDate);
+      const matchesQuery =
+        !receiveSearch ||
+        r.category.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        r.receiveFrom.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        (r.remarks && r.remarks.toLowerCase().includes(receiveSearch.toLowerCase()));
+      return matchesDate && matchesQuery;
+    });
+  }, [wasteReceives, receiveStartDate, receiveEndDate, receiveSearch]);
+
+  // Filtered Waste Issues
+  const filteredWasteIssues = useMemo(() => {
+    return wasteIssues.filter((i) => {
+      const matchesDate = isDateInRange(i.date, issueStartDate, issueEndDate);
+      const matchesQuery =
+        !issueSearch ||
+        i.srNo.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.category.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.issueTo.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        (i.remarks && i.remarks.toLowerCase().includes(issueSearch.toLowerCase()));
+      return matchesDate && matchesQuery;
+    });
+  }, [wasteIssues, issueStartDate, issueEndDate, issueSearch]);
 
   // Compute Category Stock Balance
   const getCategoryStock = (): WasteCategoryStock[] => {
@@ -452,20 +493,48 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
             </form>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Wastage Receive Log ({wasteReceives.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Wastage Receive Log"
-              >
-                <Printer className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Print Log
-              </button>
+          {/* Wastage Receive Log Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Wastage Receive Log ({wasteReceives.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter by timeframe or search by category / source</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={receiveSearch}
+                    onChange={(e) => setReceiveSearch(e.target.value)}
+                    placeholder="Search Category / Source..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Wastage Receive Log"
+                >
+                  <Printer className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            <DateRangeFilter
+              startDate={receiveStartDate}
+              endDate={receiveEndDate}
+              onStartDateChange={setReceiveStartDate}
+              onEndDateChange={setReceiveEndDate}
+              totalCount={wasteReceives.length}
+              filteredCount={filteredWasteReceives.length}
+              label="Filter Wastage Receive by Date Range"
+              accentColor="rose"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -480,14 +549,14 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {wasteReceives.length === 0 ? (
+                  {filteredWasteReceives.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                        No wastage receive entries recorded.
+                        No wastage receive entries match the selected date range / query.
                       </td>
                     </tr>
                   ) : (
-                    [...wasteReceives].reverse().map((r) => (
+                    [...filteredWasteReceives].reverse().map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                         <td className="px-4 py-3 font-mono">{r.date}</td>
                         <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
@@ -719,20 +788,48 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
             </form>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Wastage Issue History ({wasteIssues.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Wastage Issue History"
-              >
-                <Printer className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Print Log
-              </button>
+          {/* Wastage Issue Log Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Wastage Issue History ({wasteIssues.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter issues by date range or search by SR / category / destination</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={issueSearch}
+                    onChange={(e) => setIssueSearch(e.target.value)}
+                    placeholder="Search SR / Category / Buyer..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Wastage Issue History"
+                >
+                  <Printer className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            <DateRangeFilter
+              startDate={issueStartDate}
+              endDate={issueEndDate}
+              onStartDateChange={setIssueStartDate}
+              onEndDateChange={setIssueEndDate}
+              totalCount={wasteIssues.length}
+              filteredCount={filteredWasteIssues.length}
+              label="Filter Wastage Issues by Date Range"
+              accentColor="rose"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -748,14 +845,14 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {wasteIssues.length === 0 ? (
+                  {filteredWasteIssues.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                        No wastage issue entries recorded.
+                        No wastage issue entries match the selected date range / query.
                       </td>
                     </tr>
                   ) : (
-                    [...wasteIssues].reverse().map((i) => (
+                    [...filteredWasteIssues].reverse().map((i) => (
                       <tr key={i.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                         <td className="px-4 py-3 font-mono">{i.date}</td>
                         <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">
@@ -917,7 +1014,7 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
               </div>
 
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
-                {(['daily', 'monthly', 'category', 'ledger'] as const).map((mode) => (
+                {(['daily', 'monthly', 'range', 'category', 'ledger'] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setReportType(mode)}
@@ -927,20 +1024,62 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
                         : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                     }`}
                   >
-                    {mode}
+                    {mode === 'range' ? 'Date Range' : mode}
                   </button>
                 ))}
               </div>
             </div>
+
+            {reportType === 'daily' && (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center gap-4">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Select Date:</label>
+                <input
+                  type="date"
+                  value={dailyDate}
+                  onChange={(e) => setDailyDate(e.target.value)}
+                  className="px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+              </div>
+            )}
+
+            {reportType === 'monthly' && (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center gap-4">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Select Month:</label>
+                <input
+                  type="month"
+                  value={monthlyPeriod}
+                  onChange={(e) => setMonthlyPeriod(e.target.value)}
+                  className="px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+              </div>
+            )}
+
+            {reportType === 'range' && (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <DateRangeFilter
+                  startDate={rangeStartDate}
+                  endDate={rangeEndDate}
+                  onStartDateChange={setRangeStartDate}
+                  onEndDateChange={setRangeEndDate}
+                  totalCount={wasteReceives.length + wasteIssues.length}
+                  filteredCount={
+                    wasteReceives.filter((r) => isDateInRange(r.date, rangeStartDate, rangeEndDate)).length +
+                    wasteIssues.filter((i) => isDateInRange(i.date, rangeStartDate, rangeEndDate)).length
+                  }
+                  label="Filter Report Records by Custom Date Range"
+                  accentColor="rose"
+                />
+              </div>
+            )}
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white capitalize">
-                Wastage {reportType} Report Export
+                Wastage {reportType === 'range' ? 'Date Range' : reportType} Report Export
               </h3>
               <p className="text-xs text-slate-500">
-                Download formatted Excel report for wastage {reportType} data
+                Download formatted Excel report for wastage {reportType === 'range' ? 'date range' : reportType} data
               </p>
             </div>
 
@@ -956,6 +1095,11 @@ export const WastageModule: React.FC<WastageModuleProps> = ({
                 onClick={() => {
                   if (reportType === 'daily') exportToExcel(wasteReceives.filter((r) => r.date === dailyDate), `Waste_Daily_${dailyDate}`);
                   if (reportType === 'monthly') exportToExcel(wasteReceives.filter((r) => r.date.startsWith(monthlyPeriod)), `Waste_Monthly_${monthlyPeriod}`);
+                  if (reportType === 'range') {
+                    const rangeRec = wasteReceives.filter((r) => isDateInRange(r.date, rangeStartDate, rangeEndDate));
+                    const rangeIss = wasteIssues.filter((i) => isDateInRange(i.date, rangeStartDate, rangeEndDate));
+                    exportToExcel([...rangeRec, ...rangeIss], `Waste_Range_${rangeStartDate || 'all'}_to_${rangeEndDate || 'all'}`);
+                  }
                   if (reportType === 'category') exportStockExcel();
                   if (reportType === 'ledger') exportToExcel([...wasteReceives, ...wasteIssues], 'Waste_Ledger_Full');
                   showToast('success', 'Exported', `Exported wastage ${reportType} report`);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   PackagePlus,
   PackageMinus,
@@ -7,10 +7,13 @@ import {
   Download,
   CheckCircle2,
   Printer,
+  Search,
 } from 'lucide-react';
 import { YarnReceive, YarnIssue, YarnStock } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { triggerAppPrint } from '../utils/printUtils';
+import { DateRangeFilter } from '../components/DateRangeFilter';
+import { isDateInRange } from '../utils/dateUtils';
 
 interface YarnModuleProps {
   subTab: 'receive' | 'issue' | 'stock';
@@ -54,6 +57,42 @@ export const YarnModule: React.FC<YarnModuleProps> = ({
     date: new Date().toISOString().split('T')[0],
     remarks: '',
   });
+
+  // Filter States
+  const [receiveStartDate, setReceiveStartDate] = useState('');
+  const [receiveEndDate, setReceiveEndDate] = useState('');
+  const [receiveSearch, setReceiveSearch] = useState('');
+
+  const [issueStartDate, setIssueStartDate] = useState('');
+  const [issueEndDate, setIssueEndDate] = useState('');
+  const [issueSearch, setIssueSearch] = useState('');
+
+  // Filtered Receives
+  const filteredYarnReceives = useMemo(() => {
+    return yarnReceives.filter((r) => {
+      const matchesDate = isDateInRange(r.date, receiveStartDate, receiveEndDate);
+      const matchesQuery =
+        !receiveSearch ||
+        r.count.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        r.lotNo.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        r.process.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        (r.mixingRatio && r.mixingRatio.toLowerCase().includes(receiveSearch.toLowerCase()));
+      return matchesDate && matchesQuery;
+    });
+  }, [yarnReceives, receiveStartDate, receiveEndDate, receiveSearch]);
+
+  // Filtered Issues
+  const filteredYarnIssues = useMemo(() => {
+    return yarnIssues.filter((i) => {
+      const matchesDate = isDateInRange(i.date, issueStartDate, issueEndDate);
+      const matchesQuery =
+        !issueSearch ||
+        i.buyer.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.count.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        (i.remarks && i.remarks.toLowerCase().includes(issueSearch.toLowerCase()));
+      return matchesDate && matchesQuery;
+    });
+  }, [yarnIssues, issueStartDate, issueEndDate, issueSearch]);
 
   // Calculate Yarn Stock
   const getYarnStockList = (): YarnStock[] => {
@@ -349,20 +388,48 @@ export const YarnModule: React.FC<YarnModuleProps> = ({
             </form>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Yarn Receive Log ({yarnReceives.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Yarn Receive Log"
-              >
-                <Printer className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Print Log
-              </button>
+          {/* Yarn Receive Log Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Yarn Receive Log ({yarnReceives.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter by timeframe or search by count/lot</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={receiveSearch}
+                    onChange={(e) => setReceiveSearch(e.target.value)}
+                    placeholder="Search Count / Lot..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-sky-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Yarn Receive Log"
+                >
+                  <Printer className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            <DateRangeFilter
+              startDate={receiveStartDate}
+              endDate={receiveEndDate}
+              onStartDateChange={setReceiveStartDate}
+              onEndDateChange={setReceiveEndDate}
+              totalCount={yarnReceives.length}
+              filteredCount={filteredYarnReceives.length}
+              label="Filter Yarn Receive by Date Range"
+              accentColor="sky"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -377,14 +444,14 @@ export const YarnModule: React.FC<YarnModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {yarnReceives.length === 0 ? (
+                  {filteredYarnReceives.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                        No yarn receives recorded.
+                        No yarn receives match the selected date range / search query.
                       </td>
                     </tr>
                   ) : (
-                    [...yarnReceives].reverse().map((r) => (
+                    [...filteredYarnReceives].reverse().map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                         <td className="px-4 py-3 font-mono">{r.date}</td>
                         <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
@@ -558,20 +625,47 @@ export const YarnModule: React.FC<YarnModuleProps> = ({
           </div>
 
           {/* Yarn Issue Log Table */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Yarn Issue & Delivery Log ({yarnIssues.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Yarn Issue Log"
-              >
-                <Printer className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Print Log
-              </button>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Yarn Issue & Delivery Log ({yarnIssues.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter deliveries by date timeframe or search by buyer/count</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={issueSearch}
+                    onChange={(e) => setIssueSearch(e.target.value)}
+                    placeholder="Search Buyer / Count / Vehicle..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-sky-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Yarn Issue Log"
+                >
+                  <Printer className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            <DateRangeFilter
+              startDate={issueStartDate}
+              endDate={issueEndDate}
+              onStartDateChange={setIssueStartDate}
+              onEndDateChange={setIssueEndDate}
+              totalCount={yarnIssues.length}
+              filteredCount={filteredYarnIssues.length}
+              label="Filter Yarn Deliveries by Date Range"
+              accentColor="sky"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -586,14 +680,14 @@ export const YarnModule: React.FC<YarnModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {yarnIssues.length === 0 ? (
+                  {filteredYarnIssues.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                        No yarn issues recorded yet.
+                        No yarn issues match the selected date range / search query.
                       </td>
                     </tr>
                   ) : (
-                    [...yarnIssues].reverse().map((i) => (
+                    [...filteredYarnIssues].reverse().map((i) => (
                       <tr key={i.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                         <td className="px-4 py-3 font-mono">{i.date}</td>
                         <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{i.buyer}</td>

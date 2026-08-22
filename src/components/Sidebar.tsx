@@ -11,11 +11,23 @@ import {
   Microscope,
   TestTube,
   ShieldCheck,
+  Award,
+  Package,
+  Layers,
   Boxes,
   PanelLeftClose,
   PanelLeftOpen,
   ChevronRight,
   X,
+  DollarSign,
+  Receipt,
+  TrendingUp,
+  TrendingDown,
+  BookOpen,
+  Wallet,
+  Calendar,
+  CalendarDays,
+  FileText,
 } from 'lucide-react';
 import { ModuleType, User } from '../types';
 
@@ -366,24 +378,167 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* SECTION: Audit & Compliance */}
+          {/* SECTION: Accounts & Finance */}
           <div className="pt-2">
             <div className={`px-3 pb-1 ${sidebarOpen ? 'block' : 'hidden md:hidden'}`}>
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-                Audit & Standards
+                Accounts & Factory Cash
               </span>
             </div>
             <div className="space-y-0.5">
               <button
-                onClick={() => handleNav('audit-compliance')}
+                onClick={() => handleNav('accounts-dashboard')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                  isNavActive('audit-compliance')
+                  isNavActive('accounts-dashboard') || isNavActive('accounts-vouchers')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Wallet className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Cash Dashboard</span>
+              </button>
+              <button
+                onClick={() => handleNav('accounts-receive')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('accounts-receive') || isNavActive('accounts-income')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>টাকা Receive / জমা</span>
+              </button>
+              <button
+                onClick={() => handleNav('accounts-expense')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('accounts-expense')
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <TrendingDown className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>দৈনিক খরচ (Expense)</span>
+              </button>
+              <button
+                onClick={() => handleNav('accounts-daily-summary')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('accounts-daily-summary') || isNavActive('accounts-ledger')
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>দৈনিক ক্যাশ সামারি</span>
+              </button>
+              <button
+                onClick={() => handleNav('accounts-monthly-summary')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('accounts-monthly-summary')
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <CalendarDays className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>মাসিক হিসাব সামারি</span>
+              </button>
+              <button
+                onClick={() => handleNav('accounts-reports')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('accounts-reports')
+                    ? 'bg-slate-700 text-white shadow-md'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <FileText className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Accounts Reports</span>
+              </button>
+            </div>
+          </div>
+
+          {/* SECTION: Audit & Compliance */}
+          <div className="pt-2">
+            <div className={`px-3 pb-1 ${sidebarOpen ? 'block' : 'hidden md:hidden'}`}>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                Audit & Traceability
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              <button
+                onClick={() => handleNav('audit-dashboard')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('audit-dashboard') || isNavActive('audit-compliance')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Audit Dashboard</span>
+              </button>
+              <button
+                onClick={() => handleNav('audit-receives')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('audit-receives')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Package className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Certified Receive (TC)</span>
+              </button>
+              <button
+                onClick={() => handleNav('audit-traceability')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('audit-traceability')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
                 <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Audit & Compliance</span>
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>TC Traceability & Stock</span>
+              </button>
+              <button
+                onClick={() => handleNav('audit-usages')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('audit-usages')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Layers className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Usage & Production</span>
+              </button>
+              <button
+                onClick={() => handleNav('audit-schedule')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('audit-schedule')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Audit & CAPA Tracker</span>
+              </button>
+              <button
+                onClick={() => handleNav('audit-certificates')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('audit-certificates')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <Award className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Scope Certificates</span>
+              </button>
+              <button
+                onClick={() => handleNav('audit-reports')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+                  isNavActive('audit-reports')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                }`}
+              >
+                <FileText className="w-4 h-4 flex-shrink-0" />
+                <span className={sidebarOpen ? 'block' : 'hidden md:hidden'}>Audit Reports Hub</span>
               </button>
             </div>
           </div>

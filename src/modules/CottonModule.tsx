@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   PackagePlus,
   PackageMinus,
@@ -15,6 +15,8 @@ import {
 import { CottonReceive, CottonIssue, CottonLotStock } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { triggerAppPrint } from '../utils/printUtils';
+import { DateRangeFilter } from '../components/DateRangeFilter';
+import { isDateInRange } from '../utils/dateUtils';
 
 interface CottonModuleProps {
   subTab: 'receive' | 'issue' | 'stock' | 'reports';
@@ -71,15 +73,54 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
     remarks: '',
   });
 
+  // Filter States
+  const [receiveStartDate, setReceiveStartDate] = useState('');
+  const [receiveEndDate, setReceiveEndDate] = useState('');
+  const [receiveSearch, setReceiveSearch] = useState('');
+
+  const [issueStartDate, setIssueStartDate] = useState('');
+  const [issueEndDate, setIssueEndDate] = useState('');
+  const [issueSearch, setIssueSearch] = useState('');
+
   // Reports Date Selectors
-  const [reportType, setReportType] = useState<'daily' | 'monthly' | 'receive' | 'issue' | 'ledger' | 'stock'>('daily');
+  const [reportType, setReportType] = useState<'daily' | 'monthly' | 'range' | 'receive' | 'issue' | 'ledger' | 'stock'>('daily');
   const [dailyDate, setDailyDate] = useState(new Date().toISOString().split('T')[0]);
   const [monthlyPeriod, setMonthlyPeriod] = useState(new Date().toISOString().substring(0, 7));
+  const [rangeStartDate, setRangeStartDate] = useState('');
+  const [rangeEndDate, setRangeEndDate] = useState('');
 
   // Auto-generate SR No
   const generateSrNo = () => {
     return `SR-C-${new Date().getFullYear()}-${String(cottonIssues.length + 1).padStart(3, '0')}`;
   };
+
+  // Filtered Cotton Receives
+  const filteredCottonReceives = useMemo(() => {
+    return cottonReceives.filter((r) => {
+      const matchesDate = isDateInRange(r.date, receiveStartDate, receiveEndDate);
+      const matchesQuery =
+        !receiveSearch ||
+        r.consignment.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        r.origin.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        (r.supplierName && r.supplierName.toLowerCase().includes(receiveSearch.toLowerCase())) ||
+        r.lcNo.toLowerCase().includes(receiveSearch.toLowerCase());
+      return matchesDate && matchesQuery;
+    });
+  }, [cottonReceives, receiveStartDate, receiveEndDate, receiveSearch]);
+
+  // Filtered Cotton Issues
+  const filteredCottonIssues = useMemo(() => {
+    return cottonIssues.filter((i) => {
+      const matchesDate = isDateInRange(i.date, issueStartDate, issueEndDate);
+      const matchesQuery =
+        !issueSearch ||
+        i.srNo.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.consignment.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.department.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.processType.toLowerCase().includes(issueSearch.toLowerCase());
+      return matchesDate && matchesQuery;
+    });
+  }, [cottonIssues, issueStartDate, issueEndDate, issueSearch]);
 
   // Compute Cotton Stock by Consignment Lot
   const getLotStock = (): CottonLotStock[] => {
@@ -499,20 +540,48 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
           </div>
 
           {/* Receive History Table */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Recent Cotton Receive Log ({cottonReceives.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Cotton Receive Log"
-              >
-                <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Log
-              </button>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Cotton Receive Log ({cottonReceives.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter by date timeframe or search by lot/origin</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={receiveSearch}
+                    onChange={(e) => setReceiveSearch(e.target.value)}
+                    placeholder="Search Lot / Origin / LC..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Filtered Cotton Receive Log"
+                >
+                  <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            {/* Date Range Filter Control */}
+            <DateRangeFilter
+              startDate={receiveStartDate}
+              endDate={receiveEndDate}
+              onStartDateChange={setReceiveStartDate}
+              onEndDateChange={setReceiveEndDate}
+              totalCount={cottonReceives.length}
+              filteredCount={filteredCottonReceives.length}
+              label="Filter Cotton Receive by Date Range"
+              accentColor="amber"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -528,14 +597,14 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {cottonReceives.length === 0 ? (
+                  {filteredCottonReceives.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                        No cotton receive entries recorded yet.
+                        No cotton receive entries match the selected date range / filters.
                       </td>
                     </tr>
                   ) : (
-                    [...cottonReceives].reverse().map((r) => (
+                    [...filteredCottonReceives].reverse().map((r) => (
                       <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                         <td className="px-4 py-3 font-mono">{r.date}</td>
                         <td className="px-4 py-3 font-semibold">{r.origin}</td>
@@ -728,20 +797,48 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
           </div>
 
           {/* Issue History Table */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Cotton Issue History ({cottonIssues.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Cotton Issue History"
-              >
-                <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Log
-              </button>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Cotton Issue History ({cottonIssues.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter by date timeframe or search by SR No / department / lot</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={issueSearch}
+                    onChange={(e) => setIssueSearch(e.target.value)}
+                    placeholder="Search SR / Lot / Dept..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Cotton Issue History"
+                >
+                  <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            {/* Date Range Filter Control */}
+            <DateRangeFilter
+              startDate={issueStartDate}
+              endDate={issueEndDate}
+              onStartDateChange={setIssueStartDate}
+              onEndDateChange={setIssueEndDate}
+              totalCount={cottonIssues.length}
+              filteredCount={filteredCottonIssues.length}
+              label="Filter Cotton Issues by Date Range"
+              accentColor="amber"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -756,14 +853,14 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {cottonIssues.length === 0 ? (
+                  {filteredCottonIssues.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                        No cotton issues recorded yet.
+                        No cotton issue entries match the selected date range / filters.
                       </td>
                     </tr>
                   ) : (
-                    [...cottonIssues].reverse().map((i) => (
+                    [...filteredCottonIssues].reverse().map((i) => (
                       <tr key={i.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
                         <td className="px-4 py-3 font-mono">{i.date}</td>
                         <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">
@@ -924,8 +1021,8 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
               </div>
 
               {/* Report Sub-selector */}
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
-                {(['daily', 'monthly', 'receive', 'issue', 'ledger', 'stock'] as const).map((mode) => (
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl flex-wrap">
+                {(['daily', 'monthly', 'range', 'receive', 'issue', 'ledger', 'stock'] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setReportType(mode)}
@@ -935,12 +1032,123 @@ export const CottonModule: React.FC<CottonModuleProps> = ({
                         : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                     }`}
                   >
-                    {mode}
+                    {mode === 'range' ? 'Date Range' : mode}
                   </button>
                 ))}
               </div>
             </div>
           </div>
+
+          {/* Date Range Report Mode */}
+          {reportType === 'range' && (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Custom Date Range Cotton Report
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Analyze transactions, receipts, and mixing issues over any custom timeframe
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => triggerAppPrint()}
+                    className="no-print px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1 transition"
+                    title="Print Date Range Report"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Print Report
+                  </button>
+                  <button
+                    onClick={() => {
+                      const rangeRec = cottonReceives.filter((r) => isDateInRange(r.date, rangeStartDate, rangeEndDate));
+                      const rangeIss = cottonIssues.filter((i) => isDateInRange(i.date, rangeStartDate, rangeEndDate));
+                      exportToExcel(
+                        [
+                          ...rangeRec.map((r) => ({ Type: 'RECEIVE', ...r })),
+                          ...rangeIss.map((i) => ({ Type: 'ISSUE', ...i })),
+                        ],
+                        `Cotton_Report_${rangeStartDate || 'start'}_to_${rangeEndDate || 'end'}`
+                      );
+                      showToast('success', 'Excel Exported', 'Downloaded custom date range report');
+                    }}
+                    className="px-3 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export Excel
+                  </button>
+                </div>
+              </div>
+
+              <DateRangeFilter
+                startDate={rangeStartDate}
+                endDate={rangeEndDate}
+                onStartDateChange={setRangeStartDate}
+                onEndDateChange={setRangeEndDate}
+                totalCount={cottonReceives.length + cottonIssues.length}
+                filteredCount={
+                  cottonReceives.filter((r) => isDateInRange(r.date, rangeStartDate, rangeEndDate)).length +
+                  cottonIssues.filter((i) => isDateInRange(i.date, rangeStartDate, rangeEndDate)).length
+                }
+                label="Select Report Timeframe"
+                accentColor="amber"
+              />
+
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-amber-50/80 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                  <p className="text-xs font-bold text-amber-700 dark:text-amber-300">Total Bales Received</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                    {cottonReceives
+                      .filter((r) => isDateInRange(r.date, rangeStartDate, rangeEndDate))
+                      .reduce((s, r) => s + r.actualReceive, 0)}{' '}
+                    <span className="text-xs font-normal text-slate-500">Bales</span>
+                  </p>
+                  <p className="text-[11px] font-mono text-slate-500 mt-1">
+                    {Math.round(
+                      cottonReceives
+                        .filter((r) => isDateInRange(r.date, rangeStartDate, rangeEndDate))
+                        .reduce((s, r) => s + r.actualReceiveKg, 0)
+                    ).toLocaleString()}{' '}
+                    kg
+                  </p>
+                </div>
+
+                <div className="bg-amber-50/80 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                  <p className="text-xs font-bold text-amber-700 dark:text-amber-300">Total Bales Issued</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                    {cottonIssues
+                      .filter((i) => isDateInRange(i.date, rangeStartDate, rangeEndDate))
+                      .reduce((s, i) => s + i.baleQty, 0)}{' '}
+                    <span className="text-xs font-normal text-slate-500">Bales</span>
+                  </p>
+                  <p className="text-[11px] font-mono text-slate-500 mt-1">
+                    {Math.round(
+                      cottonIssues
+                        .filter((i) => isDateInRange(i.date, rangeStartDate, rangeEndDate))
+                        .reduce((s, i) => s + i.weightKg, 0)
+                    ).toLocaleString()}{' '}
+                    kg
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-700/40 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
+                  <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Net Period Balance</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                    {cottonReceives
+                      .filter((r) => isDateInRange(r.date, rangeStartDate, rangeEndDate))
+                      .reduce((s, r) => s + r.actualReceive, 0) -
+                      cottonIssues
+                        .filter((i) => isDateInRange(i.date, rangeStartDate, rangeEndDate))
+                        .reduce((s, i) => s + i.baleQty, 0)}{' '}
+                    <span className="text-xs font-normal text-slate-500">Bales</span>
+                  </p>
+                  <p className="text-[11px] font-mono text-slate-500 mt-1">
+                    Receipts vs Issues in selected window
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Daily Report */}
           {reportType === 'daily' && (

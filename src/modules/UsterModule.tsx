@@ -18,6 +18,8 @@ import {
 import { UsterReport, UsterStage } from '../types';
 import { exportToExcel, exportUsterPDFReport, USTER_ORDERED_STAGES } from '../utils/exportUtils';
 import { triggerAppPrint } from '../utils/printUtils';
+import { DateRangeFilter } from '../components/DateRangeFilter';
+import { isDateInRange } from '../utils/dateUtils';
 
 interface UsterModuleProps {
   usterReports: UsterReport[];
@@ -39,11 +41,20 @@ export const USTER_STAGES: {
   {
     key: 'finished_yarn',
     labelEn: 'Finished Yarn Test',
-    subTitle: 'Autoconer Package (Cone)',
+    subTitle: 'Autoconer Package',
     shortLabel: 'Finished Yarn',
     category: 'yarn',
     prefix: 'UT-FIN',
     badgeColor: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border-rose-300 dark:border-rose-700',
+  },
+  {
+    key: 'rotor_yarn',
+    labelEn: 'Rotor Yarn Test',
+    subTitle: 'Rotor Package',
+    shortLabel: 'Rotor Yarn',
+    category: 'yarn',
+    prefix: 'UT-RTR',
+    badgeColor: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 border-orange-300 dark:border-orange-700',
   },
   {
     key: 'ring_yarn',
@@ -57,7 +68,7 @@ export const USTER_STAGES: {
   {
     key: 'simplex_roving',
     labelEn: 'Simplex Roving Test',
-    subTitle: 'Speed Frame Roving',
+    subTitle: 'Speed Frame',
     shortLabel: 'Simplex Roving',
     category: 'sliver_roving',
     prefix: 'UT-SMP',
@@ -75,7 +86,7 @@ export const USTER_STAGES: {
   {
     key: 'b_drawing',
     labelEn: 'B Drawing Test',
-    subTitle: 'Breaker Drawing Sliver',
+    subTitle: 'Breaker Drawing',
     shortLabel: 'B Drawing',
     category: 'sliver_roving',
     prefix: 'UT-BDR',
@@ -84,7 +95,7 @@ export const USTER_STAGES: {
   {
     key: 'card_sliver',
     labelEn: 'Carding Sliver Test',
-    subTitle: 'Card Sliver Evenness',
+    subTitle: 'Card Sliver',
     shortLabel: 'Carding',
     category: 'sliver_roving',
     prefix: 'UT-CRD',
@@ -93,7 +104,7 @@ export const USTER_STAGES: {
   {
     key: 'all',
     labelEn: 'All Stages Overview',
-    subTitle: 'Sequential Process Flow (1 to 6)',
+    subTitle: 'Sequential Process Flow (1 to 7)',
     shortLabel: 'All Stages',
     category: 'all',
     prefix: 'UT',
@@ -111,6 +122,8 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
   const [selectedStage, setSelectedStage] = useState<UsterStage | 'all'>(initialStage);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLotFilter, setSelectedLotFilter] = useState('ALL');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -153,9 +166,19 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
     return Array.from(lots);
   }, [usterReports]);
 
-  // Filtered reports
+  // Date-filtered all reports (for Full PDF export across all stages)
+  const dateFilteredAllReports = useMemo(() => {
+    return usterReports.filter((r) => isDateInRange(r.testDate, startDate, endDate));
+  }, [usterReports, startDate, endDate]);
+
+  // Filtered reports for active stage & search
   const filteredReports = useMemo(() => {
     return usterReports.filter((r) => {
+      // Date filter
+      if (!isDateInRange(r.testDate, startDate, endDate)) {
+        return false;
+      }
+
       // Stage filter
       if (selectedStage !== 'all') {
         const itemStage = r.stage || (r.count ? 'ring_yarn' : 'card_sliver');
@@ -188,7 +211,7 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
 
       return true;
     });
-  }, [usterReports, selectedStage, selectedLotFilter, searchQuery]);
+  }, [usterReports, selectedStage, selectedLotFilter, searchQuery, startDate, endDate]);
 
   // Statistics calculation for the active stage
   const stageStats = useMemo(() => {
@@ -366,6 +389,31 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
         neps: '',
         ipi: '',
         hairiness: '',
+      });
+    } else if (st === 'rotor_yarn') {
+      const thin = 0;
+      const thick = 8;
+      const neps = 15;
+      setFormData({
+        uTestId: newTestId,
+        testDate: new Date().toISOString().split('T')[0],
+        machine: 'Schlafhorst Autocoro OE # 01',
+        lotNo: 'LOT-OE-1601',
+        mixing: 'Cotton 100% (Carded Blend)',
+        shift: 'A',
+        testedBy: 'Quality Officer',
+        remarks: '',
+        unevenness: '11.50',
+        cvm: '14.60',
+        cvm1m: '',
+        cvm3m: '',
+        count: '16/1 OE Rotor (Package)',
+        csp: '1850',
+        thinPlaces: String(thin),
+        thickPlaces: String(thick),
+        neps: String(neps),
+        ipi: String(thin + thick + neps),
+        hairiness: '4.2',
       });
     } else if (st === 'ring_yarn') {
       const thin = 2;
@@ -546,7 +594,10 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
     selectedStage === 'b_drawing' ||
     selectedStage === 'f_drawing' ||
     selectedStage === 'simplex_roving';
-  const isYarnStage = selectedStage === 'ring_yarn' || selectedStage === 'finished_yarn';
+  const isYarnStage =
+    selectedStage === 'finished_yarn' ||
+    selectedStage === 'rotor_yarn' ||
+    selectedStage === 'ring_yarn';
 
   // Export handlers
   const handleExportExcel = () => {
@@ -556,16 +607,16 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
   };
 
   const handleExportPDF = () => {
-    exportUsterPDFReport(usterReports, selectedStage, selectedLotFilter);
+    exportUsterPDFReport(dateFilteredAllReports, selectedStage, selectedLotFilter);
     showToast('success', 'PDF Exported', `Downloaded ${activeStageConfig.labelEn} official report (.pdf)`);
   };
 
   const handleExportFullPDF = () => {
-    exportUsterPDFReport(usterReports, 'all', selectedLotFilter);
+    exportUsterPDFReport(dateFilteredAllReports, 'all', selectedLotFilter);
     showToast(
       'success',
       'Full PDF Exported',
-      'Downloaded Complete 6-Stage Process Quality Report (Finished Yarn to Carding)'
+      'Downloaded Complete 7-Stage Process Quality Report (Finished Yarn to Carding)'
     );
   };
 
@@ -586,10 +637,14 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
               Uster Test Module
             </h1>
             <p className="text-sm text-purple-200/80 leading-relaxed">
-              Complete sequential process quality monitoring: <strong>1. Finished Yarn</strong> &rarr;{' '}
-              <strong>2. Ring Yarn</strong> &rarr; <strong>3. Simplex Roving</strong> &rarr;{' '}
-              <strong>4. F. Drawing</strong> &rarr; <strong>5. B Drawing</strong> &rarr;{' '}
-              <strong>6. Carding Sliver</strong>.
+              Complete sequential process quality monitoring:{' '}
+              <strong>1. Finished Yarn (Autoconer)</strong> &rarr;{' '}
+              <strong>2. Rotor Yarn (Rotor Package)</strong> &rarr;{' '}
+              <strong>3. Ring Yarn (Ring Cop)</strong> &rarr;{' '}
+              <strong>4. Simplex Roving (Speed Frame)</strong> &rarr;{' '}
+              <strong>5. F. Drawing (Finisher Drawing)</strong> &rarr;{' '}
+              <strong>6. B Drawing (Breaker Drawing)</strong> &rarr;{' '}
+              <strong>7. Carding Sliver (Card Sliver)</strong>.
             </p>
           </div>
 
@@ -597,10 +652,10 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
             <button
               onClick={() => handleExportFullPDF()}
               className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-600/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-              title="Download Complete 6-Stage Process Flow PDF (Finished Yarn -> Ring -> Simplex -> F. Drawing -> B Drawing -> Carding)"
+              title="Download Complete 7-Stage Process Flow PDF (Finished Yarn -> Rotor -> Ring -> Simplex -> F. Drawing -> B Drawing -> Carding)"
             >
               <FileText className="w-4 h-4 text-white" />
-              <span>Export Full PDF (All 6 Stages)</span>
+              <span>Export Full PDF (All 7 Stages)</span>
             </button>
             <button
               onClick={() => handleOpenAdd()}
@@ -781,64 +836,77 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
       </div>
 
       {/* Action and Filter Control Bar */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3 flex-1 max-w-xl">
-          {/* Search Box */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by U Test ID, Lot, Machine, Mixing, Count..."
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
-            />
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1 max-w-xl">
+            {/* Search Box */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by U Test ID, Lot, Machine, Mixing, Count..."
+                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+              />
+            </div>
+
+            {/* Lot Filter */}
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <select
+                value={selectedLotFilter}
+                onChange={(e) => setSelectedLotFilter(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none cursor-pointer"
+              >
+                <option value="ALL">All Lots ({distinctLots.length})</option>
+                {distinctLots.map((lot) => (
+                  <option key={lot} value={lot}>
+                    {lot}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Lot Filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
-            <select
-              value={selectedLotFilter}
-              onChange={(e) => setSelectedLotFilter(e.target.value)}
-              className="px-3 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none cursor-pointer"
+          {/* Exports & Quick Stage Add */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleExportExcel}
+              className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+              title="Download Excel Sheet"
             >
-              <option value="ALL">All Lots ({distinctLots.length})</option>
-              {distinctLots.map((lot) => (
-                <option key={lot} value={lot}>
-                  {lot}
-                </option>
-              ))}
-            </select>
+              <Download className="w-3.5 h-3.5" />
+              <span>Excel</span>
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+              title="Download Official PDF Report"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>PDF</span>
+            </button>
+            <button
+              onClick={() => handleOpenAdd()}
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add {activeStageConfig.shortLabel} Test</span>
+            </button>
           </div>
         </div>
 
-        {/* Exports & Quick Stage Add */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleExportExcel}
-            className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-            title="Download Excel Sheet"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Excel</span>
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-            title="Download Official PDF Report"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>PDF</span>
-          </button>
-          <button
-            onClick={() => handleOpenAdd()}
-            className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Add {activeStageConfig.shortLabel} Test</span>
-          </button>
-        </div>
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          totalCount={usterReports.length}
+          filteredCount={filteredReports.length}
+          label={`Filter ${activeStageConfig.labelEn} by Test Date`}
+          accentColor="purple"
+        />
       </div>
 
       {/* Main Uster Test Table */}
@@ -1270,11 +1338,11 @@ export const UsterModule: React.FC<UsterModuleProps> = ({
                 </div>
               )}
 
-              {/* STAGE 5-6: RING YARN & FINISHED YARN SPECIFIC INPUTS */}
-              {(formStage === 'ring_yarn' || formStage === 'finished_yarn') && (
+              {/* STAGE 5-7: RING, ROTOR & FINISHED YARN SPECIFIC INPUTS */}
+              {(formStage === 'ring_yarn' || formStage === 'rotor_yarn' || formStage === 'finished_yarn') && (
                 <div className="p-4 bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/40 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between text-xs font-extrabold text-purple-900 dark:text-purple-300">
-                    <span>Ring Yarn & Finished Yarn Parameters</span>
+                    <span>Yarn Package Parameters</span>
                     <span className="text-[10px] font-normal text-purple-700 dark:text-purple-400">
                       A. Count • CSP • U% • CVm% • Thin • Thick • Neps • Automatic IPI
                     </span>

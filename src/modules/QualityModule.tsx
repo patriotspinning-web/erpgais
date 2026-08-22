@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Microscope,
   Plus,
@@ -11,6 +11,8 @@ import {
 import { HVIReport, UsterReport } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { triggerAppPrint } from '../utils/printUtils';
+import { DateRangeFilter } from '../components/DateRangeFilter';
+import { isDateInRange } from '../utils/dateUtils';
 import { UsterModule } from './UsterModule';
 
 interface QualityModuleProps {
@@ -32,8 +34,10 @@ export const QualityModule: React.FC<QualityModuleProps> = ({
   requestAdminAction,
   showToast,
 }) => {
-  // Search state
+  // Search and date filter state
   const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Modals
   const [showHVIModal, setShowHVIModal] = useState(false);
@@ -58,11 +62,15 @@ export const QualityModule: React.FC<QualityModuleProps> = ({
   });
 
   // Filtered lists
-  const filteredHVI = hviReports.filter((h) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return h.consignment.toLowerCase().includes(q) || h.colorGrade.toLowerCase().includes(q);
-  });
+  const filteredHVI = useMemo(() => {
+    return hviReports.filter((h) => {
+      const matchesDate = isDateInRange(h.testDate, startDate, endDate);
+      if (!matchesDate) return false;
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return h.consignment.toLowerCase().includes(q) || h.colorGrade.toLowerCase().includes(q);
+    });
+  }, [hviReports, searchQuery, startDate, endDate]);
 
   // Open HVI modal
   const handleOpenAddHVI = () => {
@@ -113,13 +121,13 @@ export const QualityModule: React.FC<QualityModuleProps> = ({
 
   // EXPORTS
   const exportHVIExcel = () => {
-    exportToExcel(hviReports, 'HVI_Quality_Test_Reports');
+    exportToExcel(filteredHVI, 'HVI_Quality_Test_Reports');
     showToast('success', 'Excel Exported', 'Downloaded HVI Test Reports (.xlsx)');
   };
 
   const exportHVIPDF = () => {
     const headers = ['Date', 'Consignment', 'MIC', 'UHML', 'UI%', 'STR', 'Moist%', 'Rd', '+b', 'Trash Cnt', 'Trash Ar%', 'SCI'];
-    const rows = hviReports.map((h) => [
+    const rows = filteredHVI.map((h) => [
       h.testDate,
       h.consignment,
       h.mic,
@@ -168,39 +176,52 @@ export const QualityModule: React.FC<QualityModuleProps> = ({
           </div>
 
           {/* Search & Export Bar */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm flex items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search consignment..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
-              />
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search consignment..."
+                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 font-bold rounded-xl text-xs flex items-center gap-1 transition"
+                  title="Print HVI Reports"
+                >
+                  <Printer className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Print
+                </button>
+                <button
+                  onClick={exportHVIExcel}
+                  className="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-xl text-xs flex items-center gap-1"
+                >
+                  <Download className="w-3.5 h-3.5" /> Excel
+                </button>
+                <button
+                  onClick={exportHVIPDF}
+                  className="px-3 py-1.5 bg-purple-100 text-purple-700 font-bold rounded-xl text-xs flex items-center gap-1"
+                >
+                  <Download className="w-3.5 h-3.5" /> PDF
+                </button>
+              </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 font-bold rounded-xl text-xs flex items-center gap-1 transition"
-                title="Print HVI Reports"
-              >
-                <Printer className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Print
-              </button>
-              <button
-                onClick={exportHVIExcel}
-                className="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-xl text-xs flex items-center gap-1"
-              >
-                <Download className="w-3.5 h-3.5" /> Excel
-              </button>
-              <button
-                onClick={exportHVIPDF}
-                className="px-3 py-1.5 bg-purple-100 text-purple-700 font-bold rounded-xl text-xs flex items-center gap-1"
-              >
-                <Download className="w-3.5 h-3.5" /> PDF
-              </button>
-            </div>
+            <DateRangeFilter
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              totalCount={hviReports.length}
+              filteredCount={filteredHVI.length}
+              label="Filter HVI Test Reports by Date"
+              accentColor="purple"
+            />
           </div>
 
           {/* HVI Table */}

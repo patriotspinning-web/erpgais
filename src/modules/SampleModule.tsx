@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TestTube,
   PackageCheck,
@@ -26,6 +26,8 @@ import {
 import { SampleItem, SampleType, SampleStatus } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { triggerAppPrint } from '../utils/printUtils';
+import { DateRangeFilter } from '../components/DateRangeFilter';
+import { isDateInRange } from '../utils/dateUtils';
 
 interface SampleModuleProps {
   sampleItems: SampleItem[];
@@ -41,6 +43,8 @@ export const SampleModule: React.FC<SampleModuleProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<SampleItem | null>(null);
   const [printableTagModal, setPrintableTagModal] = useState<SampleItem | null>(null);
@@ -294,20 +298,23 @@ export const SampleModule: React.FC<SampleModuleProps> = ({
     }
   };
 
-  const filteredItems = sampleItems.filter((item) => {
-    const matchesSearch =
-      item.sampleCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.customerBrand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.testReport.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.remarks.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.machineFrame.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredItems = useMemo(() => {
+    return sampleItems.filter((item) => {
+      const matchesSearch =
+        item.sampleCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.customerBrand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.testReport.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.remarks.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.machineFrame.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesType = selectedType === 'All' || item.sampleType === selectedType;
-    const matchesStatus = selectedStatus === 'All' || item.status === selectedStatus;
+      const matchesType = selectedType === 'All' || item.sampleType === selectedType;
+      const matchesStatus = selectedStatus === 'All' || item.status === selectedStatus;
+      const matchesDate = isDateInRange(item.installedOn, startDate, endDate);
 
-    return matchesSearch && matchesType && matchesStatus;
-  });
+      return matchesSearch && matchesType && matchesStatus && matchesDate;
+    });
+  }, [sampleItems, searchTerm, selectedType, selectedStatus, startDate, endDate]);
 
   // KPI Statistics
   const totalSamples = sampleItems.length;
@@ -466,56 +473,67 @@ export const SampleModule: React.FC<SampleModuleProps> = ({
       </div>
 
       {/* Controls & Search */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-        
-        {/* Search */}
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search item, quantity, test report, brand..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-        </div>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+          {/* Search */}
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search item, quantity, test report, brand..."
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+          </div>
 
-        {/* Type Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-          <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5" /> Type:
-          </span>
-          {['All', ...sampleTypesList].map((st) => (
-            <button
-              key={st}
-              onClick={() => setSelectedType(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
-                selectedType === st
-                  ? 'bg-sky-600 text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {st}
-            </button>
-          ))}
-        </div>
-
-        {/* Status Dropdown */}
-        <div className="w-full md:w-auto">
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full md:w-auto px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
-          >
-            <option value="All">All Statuses</option>
-            {sampleStatusList.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
+          {/* Type Filter Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+            <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5" /> Type:
+            </span>
+            {['All', ...sampleTypesList].map((st) => (
+              <button
+                key={st}
+                onClick={() => setSelectedType(st)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                  selectedType === st
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {st}
+              </button>
             ))}
-          </select>
+          </div>
+
+          {/* Status Dropdown */}
+          <div className="w-full md:w-auto">
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full md:w-auto px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="All">All Statuses</option>
+              {sampleStatusList.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          totalCount={sampleItems.length}
+          filteredCount={filteredItems.length}
+          label="Filter Sample Records by Installed / Sent Date"
+          accentColor="sky"
+        />
       </div>
 
       {/* Main Samples Table */}

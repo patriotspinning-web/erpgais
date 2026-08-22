@@ -27,7 +27,23 @@ export type ModuleType =
   | 'hvi-reports'
   | 'uster-reports'
   | 'audit-compliance'
-  | 'sample-management';
+  | 'audit-dashboard'
+  | 'audit-receives'
+  | 'audit-traceability'
+  | 'audit-usages'
+  | 'audit-schedule'
+  | 'audit-certificates'
+  | 'audit-reports'
+  | 'sample-management'
+  | 'accounts-dashboard'
+  | 'accounts-receive'
+  | 'accounts-expense'
+  | 'accounts-daily-summary'
+  | 'accounts-monthly-summary'
+  | 'accounts-reports'
+  | 'accounts-vouchers'
+  | 'accounts-income'
+  | 'accounts-ledger';
 
 // --- COTTON ---
 export interface CottonReceive {
@@ -207,16 +223,17 @@ export interface HVIReport {
 }
 
 export type UsterStage =
-  | 'card_sliver'
-  | 'b_drawing'
-  | 'f_drawing'
-  | 'simplex_roving'
+  | 'finished_yarn'
+  | 'rotor_yarn'
   | 'ring_yarn'
-  | 'finished_yarn';
+  | 'simplex_roving'
+  | 'f_drawing'
+  | 'b_drawing'
+  | 'card_sliver';
 
 export interface UsterReport {
   id: number;
-  stage?: UsterStage; // Stage: Card Sliver, B Drawing, F Drawing, Simplex Roving, Ring Yarn, Finished Yarn
+  stage?: UsterStage; // Stage: Finished Yarn, Rotor Yarn, Ring Yarn, Simplex Roving, F Drawing, B Drawing, Card Sliver
   uTestId?: string; // U Test ID (e.g. UT-CRD-001, UT-RNG-001)
   testDate: string;
   lotNo: string; // Lot
@@ -240,8 +257,121 @@ export interface UsterReport {
 }
 
 // --- AUDIT & COMPLIANCE ---
-export type AuditStandard = 'GOTS' | 'OCS' | 'ISO' | 'BCI' | 'OEKO-TEX' | 'HIGG' | 'Other';
+export type AuditStandard = 'GRS' | 'GOTS' | 'OCS' | 'BCI' | 'ISO' | 'OEKO-TEX' | 'HIGG' | 'Other';
 export type AuditStatus = 'Valid' | 'Expiring Soon' | 'Expired' | 'Audit Scheduled' | 'Pending Renewal';
+
+export type ComplianceDocType =
+  | 'Transaction Certificate (TC)'
+  | 'Scope Certificate'
+  | 'Invoice / Challan'
+  | 'Packing List'
+  | 'Audit Report'
+  | 'CAPA Report'
+  | 'Test Report'
+  | 'Other';
+
+export interface ComplianceDocument {
+  id: string;
+  name: string;
+  type: ComplianceDocType;
+  size?: string;
+  date: string;
+  url?: string;
+  notes?: string;
+}
+
+export interface CertifiedCottonReceive {
+  id: number;
+  standard: AuditStandard;
+  supplierName: string;
+  countryOfOrigin: string;
+  cottonDescription: string;
+  lotNo: string;
+  baleCount: number;
+  quantityKg: number;
+  receiveDate: string;
+  purchaseRef: string;
+  tcNumber: string;
+  tcQuantityKg: number;
+  tcIssueDate: string;
+  tcValidityDate?: string;
+  invoiceChallanNo: string;
+  remarks: string;
+  documents?: ComplianceDocument[];
+}
+
+export interface CertifiedCottonUsage {
+  id: number;
+  date: string;
+  standard: AuditStandard;
+  tcNumber: string;
+  lotNo: string;
+  buyerName: string;
+  orderRef: string;
+  yarnCount: string;
+  yarnType: string;
+  cottonUsedKg: number;
+  yarnProducedKg: number;
+  wastageKg: number; // cottonUsedKg - yarnProducedKg
+  wastagePct: number; // (wastageKg / cottonUsedKg) * 100
+  remarks: string;
+}
+
+export type AuditType =
+  | 'Initial Certification'
+  | 'Annual Surveillance'
+  | 'Renewal Audit'
+  | 'Unannounced Audit'
+  | 'Internal Factory Audit'
+  | 'Buyer / Customer Audit'
+  | 'Environmental / Social';
+
+export type AuditStatusState =
+  | 'Upcoming'
+  | 'Completed'
+  | 'Under Review'
+  | 'Corrective Action Pending'
+  | 'Closed';
+
+export type CapaStatus = 'Pending' | 'In Progress' | 'Submitted' | 'Verified & Closed' | 'N/A';
+
+export interface AuditRecord {
+  id: number;
+  standard: AuditStandard;
+  auditType: AuditType;
+  certifyingBody: string;
+  auditorName: string;
+  auditDate: string;
+  auditPeriod: string;
+  status: AuditStatusState;
+  findings: string;
+  nonConformity?: string;
+  ncLevel?: 'None' | 'Minor' | 'Major' | 'Critical';
+  correctiveAction?: string;
+  capaStatus: CapaStatus;
+  nextAuditDueDate: string;
+  scoreGrade?: string;
+  remarks: string;
+  documents?: ComplianceDocument[];
+}
+
+export type CertificateStatus = 'Valid' | 'Expiring Soon' | 'Expired' | 'Suspended' | 'In Application';
+
+export interface CertificationRecord {
+  id: number;
+  standard: AuditStandard;
+  certificateNo: string;
+  certifyingBody: string;
+  scope: string;
+  issueDate: string;
+  validFrom: string;
+  validUntil: string;
+  status: CertificateStatus;
+  licenseNo?: string;
+  contactPerson?: string;
+  remarks: string;
+  documents?: ComplianceDocument[];
+}
 
 export interface AuditItem {
   id: number;
@@ -257,6 +387,12 @@ export interface AuditItem {
   scoreGrade: string;
   documentRef?: string;
   remarks: string;
+  // Extended fields
+  auditType?: string;
+  nonConformity?: string;
+  correctiveAction?: string;
+  capaStatus?: string;
+  nextAuditDueDate?: string;
 }
 
 // --- SAMPLE MANAGEMENT ---
@@ -296,6 +432,53 @@ export interface SampleItem {
   usterThick50?: string;
   usterNeps200?: string;
   wearResistanceLife?: string;
+}
+
+// --- ACCOUNTS & FACTORY CASH MANAGEMENT ---
+export type AccountVoucherType = 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Receive' | 'Expense';
+export type AccountCategory =
+  | 'Income'
+  | 'Expense'
+  | 'Asset'
+  | 'Liability'
+  | 'Equity'
+  | string;
+export type PaymentMethod =
+  | 'Cash'
+  | 'Bank Cheque'
+  | 'L/C / Bank TT'
+  | 'BEFTN / RTGS'
+  | 'Mobile Banking'
+  | 'Adjusted / Journal'
+  | string;
+
+export interface AccountTransaction {
+  id: number;
+  voucherNo: string; // e.g. RV-2026-001, PV-2026-001
+  date: string; // YYYY-MM-DD
+  voucherType: AccountVoucherType; // 'Receipt' | 'Payment' | 'Receive' | 'Expense'
+  accountHead?: string; // e.g. Head Office Fund, Wastage Sale, Salary, Maintenance
+  category: string; // Income Category or Expense Category
+  partyName: string; // Receive From / Source OR Paid To / Supplier
+  debit: number; // Expense Amount (Debit / খরচ)
+  credit: number; // Receive Amount (Credit / জমা)
+  amount: number; // Amount in BDT
+  paymentMethod?: PaymentMethod;
+  referenceNo?: string; // Cheque No, MR No, Challan No, Money Receipt No
+  bankAccount?: string; // e.g. Factory Cash in Hand, Bank
+  narration: string; // Description
+  remarks?: string; // Additional Remarks
+  approvedBy?: string;
+  status?: 'Approved' | 'Pending' | 'Draft';
+}
+
+export interface AccountHead {
+  id: number;
+  code: string;
+  name: string;
+  category: AccountCategory;
+  balance: number;
+  description?: string;
 }
 
 // --- TOAST ---

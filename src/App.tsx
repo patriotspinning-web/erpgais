@@ -17,11 +17,24 @@ import {
   ModuleType,
   AuditItem,
   SampleItem,
+  AccountTransaction,
+  AccountHead,
+  CertifiedCottonReceive,
+  CertifiedCottonUsage,
+  AuditRecord,
+  CertificationRecord,
 } from './types';
+import {
+  SEED_CERTIFIED_RECEIVES,
+  SEED_CERTIFIED_USAGES,
+  SEED_AUDIT_RECORDS,
+  SEED_CERTIFICATION_RECORDS,
+} from './data/auditSeedData';
 import {
   DEFAULT_COTTON_COUNTRIES,
   DEFAULT_WASTE_CATEGORIES,
   DEFAULT_SPARE_SECTIONS,
+  DEFAULT_ACCOUNT_HEADS,
   SEED_COTTON_RECEIVES,
   SEED_COTTON_ISSUES,
   SEED_WASTE_RECEIVES,
@@ -35,6 +48,7 @@ import {
   SEED_USTER_REPORTS,
   SEED_AUDIT_ITEMS,
   SEED_SAMPLE_ITEMS,
+  SEED_ACCOUNT_TRANSACTIONS,
 } from './data/seedData';
 
 // Layout components
@@ -53,6 +67,7 @@ import { YarnModule } from './modules/YarnModule';
 import { QualityModule } from './modules/QualityModule';
 import { AuditModule } from './modules/AuditModule';
 import { SampleModule } from './modules/SampleModule';
+import { AccountsModule } from './modules/AccountsModule';
 
 import {
   supabase,
@@ -93,6 +108,9 @@ import {
   syncAuditItemToSupabase,
   fetchSampleItemsFromSupabase,
   syncSampleItemToSupabase,
+  fetchAccountTransactionsFromSupabase,
+  syncAccountTransactionToSupabase,
+  deleteAccountTransactionFromSupabase,
   populateSupabaseWithInitialSeedData,
 } from './lib/supabase';
 import {
@@ -130,7 +148,7 @@ export function App() {
 
   // Navigation State
   const [activeModule, setActiveModule] = useState<
-    'dashboard' | 'cotton' | 'wastage' | 'spare' | 'yarn' | 'quality' | 'audit' | 'sample'
+    'dashboard' | 'cotton' | 'wastage' | 'spare' | 'yarn' | 'quality' | 'audit' | 'sample' | 'accounts'
   >('dashboard');
   const [subTab, setSubTab] = useState<string>('receive');
 
@@ -211,8 +229,23 @@ export function App() {
   const [auditItems, setAuditItems] = useState<AuditItem[]>(() =>
     getInitialState('patriot_erp_audit_items', SEED_AUDIT_ITEMS)
   );
+  const [certifiedCottonReceives, setCertifiedCottonReceives] = useState<CertifiedCottonReceive[]>(() =>
+    getInitialState('patriot_erp_certified_cotton_receives', SEED_CERTIFIED_RECEIVES)
+  );
+  const [certifiedCottonUsages, setCertifiedCottonUsages] = useState<CertifiedCottonUsage[]>(() =>
+    getInitialState('patriot_erp_certified_cotton_usages', SEED_CERTIFIED_USAGES)
+  );
+  const [auditRecords, setAuditRecords] = useState<AuditRecord[]>(() =>
+    getInitialState('patriot_erp_audit_records', SEED_AUDIT_RECORDS)
+  );
+  const [certificationRecords, setCertificationRecords] = useState<CertificationRecord[]>(() =>
+    getInitialState('patriot_erp_certification_records', SEED_CERTIFICATION_RECORDS)
+  );
   const [sampleItems, setSampleItems] = useState<SampleItem[]>(() =>
     getInitialState('patriot_erp_sample_items', SEED_SAMPLE_ITEMS)
+  );
+  const [accountTransactions, setAccountTransactions] = useState<AccountTransaction[]>(() =>
+    getInitialState('patriot_erp_account_transactions', SEED_ACCOUNT_TRANSACTIONS)
   );
 
   // Synchronize state changes to localStorage
@@ -230,7 +263,12 @@ export function App() {
   useEffect(() => { localStorage.setItem('patriot_erp_hvi_reports', JSON.stringify(hviReports)); }, [hviReports]);
   useEffect(() => { localStorage.setItem('patriot_erp_uster_reports', JSON.stringify(usterReports)); }, [usterReports]);
   useEffect(() => { localStorage.setItem('patriot_erp_audit_items', JSON.stringify(auditItems)); }, [auditItems]);
+  useEffect(() => { localStorage.setItem('patriot_erp_certified_cotton_receives', JSON.stringify(certifiedCottonReceives)); }, [certifiedCottonReceives]);
+  useEffect(() => { localStorage.setItem('patriot_erp_certified_cotton_usages', JSON.stringify(certifiedCottonUsages)); }, [certifiedCottonUsages]);
+  useEffect(() => { localStorage.setItem('patriot_erp_audit_records', JSON.stringify(auditRecords)); }, [auditRecords]);
+  useEffect(() => { localStorage.setItem('patriot_erp_certification_records', JSON.stringify(certificationRecords)); }, [certificationRecords]);
   useEffect(() => { localStorage.setItem('patriot_erp_sample_items', JSON.stringify(sampleItems)); }, [sampleItems]);
+  useEffect(() => { localStorage.setItem('patriot_erp_account_transactions', JSON.stringify(accountTransactions)); }, [accountTransactions]);
 
   // Toggle Dark Mode Class on Document Elements
   useEffect(() => {
@@ -270,6 +308,7 @@ export function App() {
         usterData,
         auData,
         smData,
+        atData,
       ] = await Promise.all([
         fetchCottonReceivesFromSupabase(),
         fetchCottonIssuesFromSupabase(),
@@ -284,6 +323,7 @@ export function App() {
         fetchUsterReportsFromSupabase(),
         fetchAuditItemsFromSupabase(),
         fetchSampleItemsFromSupabase(),
+        fetchAccountTransactionsFromSupabase(),
       ]);
 
       if (crData && crData.length > 0) setCottonReceives((prev) => mergeEntityList(prev, crData));
@@ -299,6 +339,7 @@ export function App() {
       if (usterData && usterData.length > 0) setUsterReports((prev) => mergeEntityList(prev, usterData));
       if (auData && auData.length > 0) setAuditItems((prev) => mergeEntityList(prev, auData));
       if (smData && smData.length > 0) setSampleItems((prev) => mergeEntityList(prev, smData));
+      if (atData && atData.length > 0) setAccountTransactions((prev) => mergeEntityList(prev, atData));
     } catch (err) {
       console.info('Supabase non-blocking sync note:', err);
     }
@@ -410,6 +451,7 @@ export function App() {
       usterReports,
       auditItems,
       sampleItems,
+      accountTransactions,
     };
     exportErpBackup(backupData);
     showToast('success', 'Backup Exported', 'Full mill database downloaded as JSON backup.');
@@ -432,11 +474,82 @@ export function App() {
       if (data.usterReports && Array.isArray(data.usterReports)) setUsterReports(data.usterReports);
       if (data.auditItems && Array.isArray(data.auditItems)) setAuditItems(data.auditItems);
       if (data.sampleItems && Array.isArray(data.sampleItems)) setSampleItems(data.sampleItems);
+      if (data.accountTransactions && Array.isArray(data.accountTransactions)) setAccountTransactions(data.accountTransactions);
 
       showToast('success', 'Backup Restored', 'All mill records imported successfully from JSON file.');
     } catch (err: any) {
       showToast('error', 'Import Failed', err?.message || 'Could not parse JSON backup file.');
     }
+  };
+
+  // Restore Full Mill Seed Data Handler
+  const handleRestoreSeedData = () => {
+    setCottonReceives(SEED_COTTON_RECEIVES);
+    setCottonIssues(SEED_COTTON_ISSUES);
+    setWasteReceives(SEED_WASTE_RECEIVES);
+    setWasteIssues(SEED_WASTE_ISSUES);
+    setSpareItems(SEED_SPARE_ITEMS);
+    setSpareReceives(SEED_SPARE_RECEIVES);
+    setSpareIssues(SEED_SPARE_ISSUES);
+    setYarnReceives(SEED_YARN_RECEIVES);
+    setYarnIssues(SEED_YARN_ISSUES);
+    setHviReports(SEED_HVI_REPORTS);
+    setUsterReports(SEED_USTER_REPORTS);
+    setAuditItems(SEED_AUDIT_ITEMS);
+    setSampleItems(SEED_SAMPLE_ITEMS);
+    setAccountTransactions(SEED_ACCOUNT_TRANSACTIONS);
+
+    localStorage.setItem('patriot_erp_cotton_receives', JSON.stringify(SEED_COTTON_RECEIVES));
+    localStorage.setItem('patriot_erp_cotton_issues', JSON.stringify(SEED_COTTON_ISSUES));
+    localStorage.setItem('patriot_erp_waste_receives', JSON.stringify(SEED_WASTE_RECEIVES));
+    localStorage.setItem('patriot_erp_waste_issues', JSON.stringify(SEED_WASTE_ISSUES));
+    localStorage.setItem('patriot_erp_spare_items', JSON.stringify(SEED_SPARE_ITEMS));
+    localStorage.setItem('patriot_erp_spare_receives', JSON.stringify(SEED_SPARE_RECEIVES));
+    localStorage.setItem('patriot_erp_spare_issues', JSON.stringify(SEED_SPARE_ISSUES));
+    localStorage.setItem('patriot_erp_yarn_receives', JSON.stringify(SEED_YARN_RECEIVES));
+    localStorage.setItem('patriot_erp_yarn_issues', JSON.stringify(SEED_YARN_ISSUES));
+    localStorage.setItem('patriot_erp_hvi_reports', JSON.stringify(SEED_HVI_REPORTS));
+    localStorage.setItem('patriot_erp_uster_reports', JSON.stringify(SEED_USTER_REPORTS));
+    localStorage.setItem('patriot_erp_audit_items', JSON.stringify(SEED_AUDIT_ITEMS));
+    localStorage.setItem('patriot_erp_sample_items', JSON.stringify(SEED_SAMPLE_ITEMS));
+    localStorage.setItem('patriot_erp_account_transactions', JSON.stringify(SEED_ACCOUNT_TRANSACTIONS));
+
+    showToast('success', 'All Records Loaded', 'Default Patriot Spinning Mills records loaded across all modules.');
+  };
+
+  // Clear All Data Handler (Wipes all modules to empty state)
+  const handleClearAllData = () => {
+    setCottonReceives([]);
+    setCottonIssues([]);
+    setWasteReceives([]);
+    setWasteIssues([]);
+    setSpareItems([]);
+    setSpareReceives([]);
+    setSpareIssues([]);
+    setYarnReceives([]);
+    setYarnIssues([]);
+    setHviReports([]);
+    setUsterReports([]);
+    setAuditItems([]);
+    setSampleItems([]);
+    setAccountTransactions([]);
+
+    localStorage.setItem('patriot_erp_cotton_receives', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_cotton_issues', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_waste_receives', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_waste_issues', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_spare_items', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_spare_receives', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_spare_issues', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_yarn_receives', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_yarn_issues', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_hvi_reports', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_uster_reports', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_audit_items', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_sample_items', JSON.stringify([]));
+    localStorage.setItem('patriot_erp_account_transactions', JSON.stringify([]));
+
+    showToast('info', 'All Modules Cleared', 'All data across every module has been emptied.');
   };
 
   // Supabase Database Seed Handler
@@ -456,6 +569,7 @@ export function App() {
       usterReports,
       auditItems,
       sampleItems,
+      accountTransactions,
     });
 
     if (result.success) {
@@ -700,6 +814,38 @@ export function App() {
     });
   };
 
+  const handleSetCertifiedCottonReceives: React.Dispatch<React.SetStateAction<CertifiedCottonReceive[]>> = (action) => {
+    setCertifiedCottonReceives((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_certified_cotton_receives', next);
+      return next;
+    });
+  };
+
+  const handleSetCertifiedCottonUsages: React.Dispatch<React.SetStateAction<CertifiedCottonUsage[]>> = (action) => {
+    setCertifiedCottonUsages((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_certified_cotton_usages', next);
+      return next;
+    });
+  };
+
+  const handleSetAuditRecords: React.Dispatch<React.SetStateAction<AuditRecord[]>> = (action) => {
+    setAuditRecords((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_audit_records', next);
+      return next;
+    });
+  };
+
+  const handleSetCertificationRecords: React.Dispatch<React.SetStateAction<CertificationRecord[]>> = (action) => {
+    setCertificationRecords((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_certification_records', next);
+      return next;
+    });
+  };
+
   const handleSetSampleItems: React.Dispatch<React.SetStateAction<SampleItem[]>> = (action) => {
     setSampleItems((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
@@ -708,6 +854,26 @@ export function App() {
         const old = prev.find((p) => p.id === item.id);
         if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
           syncSampleItemToSupabase(item);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleSetAccountTransactions: React.Dispatch<React.SetStateAction<AccountTransaction[]>> = (action) => {
+    setAccountTransactions((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      broadcastDataChange('patriot_erp_account_transactions', next);
+      next.forEach((item) => {
+        const old = prev.find((p) => p.id === item.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(item)) {
+          syncAccountTransactionToSupabase(item);
+        }
+      });
+      prev.forEach((old) => {
+        if (!next.some((n) => n.id === old.id)) {
+          recordDeletedId(old.id);
+          deleteAccountTransactionFromSupabase(old.id);
         }
       });
       return next;
@@ -754,8 +920,26 @@ export function App() {
     if (activeModule === 'spare') return `spare-${subTab}` as ModuleType;
     if (activeModule === 'yarn') return `yarn-${subTab}` as ModuleType;
     if (activeModule === 'quality') return subTab === 'hvi' ? 'hvi-reports' : 'uster-reports';
-    if (activeModule === 'audit') return 'audit-compliance';
+    if (activeModule === 'audit') {
+      if (subTab === 'receives' || subTab === 'receive') return 'audit-receives';
+      if (subTab === 'traceability' || subTab === 'trace') return 'audit-traceability';
+      if (subTab === 'usages' || subTab === 'usage' || subTab === 'production') return 'audit-usages';
+      if (subTab === 'schedule' || subTab === 'audits') return 'audit-schedule';
+      if (subTab === 'certificates' || subTab === 'certs') return 'audit-certificates';
+      if (subTab === 'reports') return 'audit-reports';
+      return 'audit-dashboard';
+    }
     if (activeModule === 'sample') return 'sample-management';
+    if (activeModule === 'accounts') {
+      if (subTab === 'dashboard') return 'accounts-dashboard';
+      if (subTab === 'receive' || subTab === 'income') return 'accounts-receive';
+      if (subTab === 'expense') return 'accounts-expense';
+      if (subTab === 'daily-summary' || subTab === 'daily' || subTab === 'ledger') return 'accounts-daily-summary';
+      if (subTab === 'monthly-summary' || subTab === 'monthly') return 'accounts-monthly-summary';
+      if (subTab === 'reports') return 'accounts-reports';
+      if (subTab === 'vouchers') return 'accounts-dashboard';
+      return 'accounts-dashboard';
+    }
     return 'dashboard';
   };
 
@@ -779,12 +963,16 @@ export function App() {
     } else if (mod === 'uster-reports') {
       setActiveModule('quality');
       setSubTab('uster');
-    } else if (mod === 'audit-compliance') {
+    } else if (mod.startsWith('audit-')) {
       setActiveModule('audit');
-      setSubTab('compliance');
+      const sub = mod.replace('audit-', '');
+      setSubTab(sub === 'compliance' ? 'dashboard' : sub);
     } else if (mod === 'sample-management') {
       setActiveModule('sample');
       setSubTab('samples');
+    } else if (mod.startsWith('accounts-')) {
+      setActiveModule('accounts');
+      setSubTab(mod.replace('accounts-', ''));
     } else {
       setActiveModule('dashboard');
       setSubTab('overview');
@@ -841,6 +1029,8 @@ export function App() {
           onSeedSupabase={handleSeedSupabase}
           onExportBackup={handleExportBackup}
           onImportBackup={handleImportBackup}
+          onRestoreSeedData={handleRestoreSeedData}
+          onClearAllData={handleClearAllData}
           onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
           cottonReceives={cottonReceives}
           cottonIssues={cottonIssues}
@@ -963,9 +1153,19 @@ export function App() {
 
           {activeModule === 'audit' && (
             <AuditModule
+              subTab={subTab}
               auditItems={auditItems}
               setAuditItems={handleSetAuditItems}
+              certifiedCottonReceives={certifiedCottonReceives}
+              setCertifiedCottonReceives={handleSetCertifiedCottonReceives}
+              certifiedCottonUsages={certifiedCottonUsages}
+              setCertifiedCottonUsages={handleSetCertifiedCottonUsages}
+              auditRecords={auditRecords}
+              setAuditRecords={handleSetAuditRecords}
+              certificationRecords={certificationRecords}
+              setCertificationRecords={handleSetCertificationRecords}
               showToast={showToast}
+              requestAdminAction={requestAdminAction}
             />
           )}
 
@@ -974,6 +1174,18 @@ export function App() {
               sampleItems={sampleItems}
               setSampleItems={handleSetSampleItems}
               showToast={showToast}
+            />
+          )}
+
+          {activeModule === 'accounts' && (
+            <AccountsModule
+              subTab={subTab as any}
+              transactions={accountTransactions}
+              accountTransactions={accountTransactions}
+              setTransactions={handleSetAccountTransactions}
+              setAccountTransactions={handleSetAccountTransactions}
+              showToast={showToast}
+              requestAdminAction={requestAdminAction}
             />
           )}
         </main>

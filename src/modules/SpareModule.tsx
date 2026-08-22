@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Database,
   PackagePlus,
@@ -19,6 +19,8 @@ import {
 import { SpareItem, SpareReceive, SpareIssue, SpareSource } from '../types';
 import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 import { triggerAppPrint } from '../utils/printUtils';
+import { DateRangeFilter } from '../components/DateRangeFilter';
+import { isDateInRange } from '../utils/dateUtils';
 
 interface SpareModuleProps {
   subTab: 'items' | 'receive' | 'issue' | 'stock' | 'reports';
@@ -109,6 +111,51 @@ export const SpareModule: React.FC<SpareModuleProps> = ({
     issuedBy: 'Store Officer',
     remarks: '',
   });
+
+  // Receive & Issue Filter States
+  const [receiveStartDate, setReceiveStartDate] = useState('');
+  const [receiveEndDate, setReceiveEndDate] = useState('');
+  const [receiveSearch, setReceiveSearch] = useState('');
+
+  const [issueStartDate, setIssueStartDate] = useState('');
+  const [issueEndDate, setIssueEndDate] = useState('');
+  const [issueSearch, setIssueSearch] = useState('');
+
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+
+  // Filtered Receives
+  const filteredSpareReceives = useMemo(() => {
+    return spareReceives.filter((r) => {
+      const matchesDate = isDateInRange(r.date, receiveStartDate, receiveEndDate);
+      const item = spareItems.find((i) => i.id === r.itemId);
+      const itemName = item?.name || '';
+      const matchesQuery =
+        !receiveSearch ||
+        r.mrrNo.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        itemName.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        r.receivedBy.toLowerCase().includes(receiveSearch.toLowerCase()) ||
+        (r.remarks && r.remarks.toLowerCase().includes(receiveSearch.toLowerCase()));
+      return matchesDate && matchesQuery;
+    });
+  }, [spareReceives, spareItems, receiveStartDate, receiveEndDate, receiveSearch]);
+
+  // Filtered Issues
+  const filteredSpareIssues = useMemo(() => {
+    return spareIssues.filter((i) => {
+      const matchesDate = isDateInRange(i.date, issueStartDate, issueEndDate);
+      const item = spareItems.find((itm) => itm.id === i.itemId);
+      const itemName = item?.name || '';
+      const matchesQuery =
+        !issueSearch ||
+        i.srNo.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        itemName.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.issueTo.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        i.issuedBy.toLowerCase().includes(issueSearch.toLowerCase()) ||
+        (i.remarks && i.remarks.toLowerCase().includes(issueSearch.toLowerCase()));
+      return matchesDate && matchesQuery;
+    });
+  }, [spareIssues, spareItems, issueStartDate, issueEndDate, issueSearch]);
 
   // Filter items
   const filteredItems = spareItems.filter((item) => {
@@ -619,20 +666,48 @@ export const SpareModule: React.FC<SpareModuleProps> = ({
             </form>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Spare Parts Receive Log ({spareReceives.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Spare Receive Log"
-              >
-                <Printer className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Print Log
-              </button>
+          {/* Spare Parts Receive Log Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Spare Parts Receive Log ({spareReceives.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter MRR entries by date range or search by MRR / item name</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={receiveSearch}
+                    onChange={(e) => setReceiveSearch(e.target.value)}
+                    placeholder="Search MRR / Item..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Spare Receive Log"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            <DateRangeFilter
+              startDate={receiveStartDate}
+              endDate={receiveEndDate}
+              onStartDateChange={setReceiveStartDate}
+              onEndDateChange={setReceiveEndDate}
+              totalCount={spareReceives.length}
+              filteredCount={filteredSpareReceives.length}
+              label="Filter Spare Receives by Date Range"
+              accentColor="emerald"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -646,14 +721,14 @@ export const SpareModule: React.FC<SpareModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {spareReceives.length === 0 ? (
+                  {filteredSpareReceives.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                        No MRR receive records logged yet.
+                        No MRR receive records match the selected date range / query.
                       </td>
                     </tr>
                   ) : (
-                    [...spareReceives].reverse().map((r) => {
+                    [...filteredSpareReceives].reverse().map((r) => {
                       const item = spareItems.find((i) => i.id === r.itemId);
                       return (
                         <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
@@ -799,20 +874,48 @@ export const SpareModule: React.FC<SpareModuleProps> = ({
             </form>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Spare Parts Issue History ({spareIssues.length})
-              </h3>
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
-                title="Print Spare Issue Log"
-              >
-                <Printer className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Print Log
-              </button>
+          {/* Spare Parts Issue Log Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm space-y-4 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Spare Parts Issue History ({spareIssues.length})
+                </h3>
+                <p className="text-xs text-slate-500">Filter store requisitions by date range or search by SR / item / section</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={issueSearch}
+                    onChange={(e) => setIssueSearch(e.target.value)}
+                    placeholder="Search SR / Item / Section..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm"
+                  title="Print Spare Issue Log"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Print Log
+                </button>
+              </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+
+            <DateRangeFilter
+              startDate={issueStartDate}
+              endDate={issueEndDate}
+              onStartDateChange={setIssueStartDate}
+              onEndDateChange={setIssueEndDate}
+              totalCount={spareIssues.length}
+              filteredCount={filteredSpareIssues.length}
+              label="Filter Spare Issues by Date Range"
+              accentColor="emerald"
+            />
+
+            <div className="overflow-x-auto max-h-[400px] border border-slate-200 dark:border-slate-700 rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                   <tr>
@@ -827,14 +930,14 @@ export const SpareModule: React.FC<SpareModuleProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
-                  {spareIssues.length === 0 ? (
+                  {filteredSpareIssues.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                        No SR issue records logged yet.
+                        No SR issue records match the selected date range / query.
                       </td>
                     </tr>
                   ) : (
-                    [...spareIssues].reverse().map((i) => {
+                    [...filteredSpareIssues].reverse().map((i) => {
                       const item = spareItems.find((itm) => itm.id === i.itemId);
                       return (
                         <tr key={i.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
@@ -942,28 +1045,94 @@ export const SpareModule: React.FC<SpareModuleProps> = ({
       {/* ==================== SUB-TAB 5: SPARE REPORTS ==================== */}
       {subTab === 'reports' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Spare Parts Inventory Exports
-              </h1>
-              <p className="text-xs text-slate-500">Full catalog, low stock alerts, and transaction ledgers</p>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                  Spare Parts Inventory Exports & Reports
+                </h1>
+                <p className="text-xs text-slate-500">Full catalog, date range transaction ledgers, and low stock alerts</p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => triggerAppPrint()}
+                  className="no-print px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs shadow transition flex items-center gap-1.5"
+                  title="Print Spare Inventory Report"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Print
+                </button>
+                <button
+                  onClick={exportItemsExcel}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow transition"
+                >
+                  Catalog Excel
+                </button>
+              </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => triggerAppPrint()}
-                className="no-print px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs shadow transition flex items-center gap-1.5"
-                title="Print Spare Inventory Report"
-              >
-                <Printer className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Print
-              </button>
-              <button
-                onClick={exportItemsExcel}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow transition"
-              >
-                Catalog Excel
-              </button>
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+              <DateRangeFilter
+                startDate={reportStartDate}
+                endDate={reportEndDate}
+                onStartDateChange={setReportStartDate}
+                onEndDateChange={setReportEndDate}
+                totalCount={spareReceives.length + spareIssues.length}
+                filteredCount={
+                  spareReceives.filter((r) => isDateInRange(r.date, reportStartDate, reportEndDate)).length +
+                  spareIssues.filter((i) => isDateInRange(i.date, reportStartDate, reportEndDate)).length
+                }
+                label="Filter Spare Transactions by Date Range for Export"
+                accentColor="emerald"
+              />
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    const rangeReceives = spareReceives.filter((r) => isDateInRange(r.date, reportStartDate, reportEndDate));
+                    const data = rangeReceives.map((r) => {
+                      const itm = spareItems.find((i) => i.id === r.itemId);
+                      return {
+                        Date: r.date,
+                        'MRR No': r.mrrNo,
+                        'Item Name': itm?.name || '',
+                        Section: itm?.section || '',
+                        Quantity: r.quantity,
+                        Unit: r.unit || itm?.unit || 'Pcs',
+                        'Received By': r.receivedBy,
+                      };
+                    });
+                    exportToExcel(data, `Spare_MRR_${reportStartDate || 'all'}_to_${reportEndDate || 'all'}`);
+                    showToast('success', 'Exported', 'Exported MRR receives report');
+                  }}
+                  className="px-3.5 py-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold rounded-xl text-xs hover:bg-emerald-100 transition"
+                >
+                  Export Filtered MRR (Excel)
+                </button>
+
+                <button
+                  onClick={() => {
+                    const rangeIssues = spareIssues.filter((i) => isDateInRange(i.date, reportStartDate, reportEndDate));
+                    const data = rangeIssues.map((i) => {
+                      const itm = spareItems.find((item) => item.id === i.itemId);
+                      return {
+                        Date: i.date,
+                        'SR No': i.srNo,
+                        'Item Name': itm?.name || '',
+                        'Issue To Section': i.issueTo,
+                        Quantity: i.quantity,
+                        Unit: i.unit || itm?.unit || 'Pcs',
+                        'Issued By': i.issuedBy,
+                      };
+                    });
+                    exportToExcel(data, `Spare_SR_${reportStartDate || 'all'}_to_${reportEndDate || 'all'}`);
+                    showToast('success', 'Exported', 'Exported SR issues report');
+                  }}
+                  className="px-3.5 py-2 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold rounded-xl text-xs hover:bg-rose-100 transition"
+                >
+                  Export Filtered SR (Excel)
+                </button>
+              </div>
             </div>
           </div>
         </div>
